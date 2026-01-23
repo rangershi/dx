@@ -1,0 +1,16 @@
+{
+  "name": "dx",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "dx": "./bin/dx.js",
+    "dx-with-version-env": "./bin/dx-with-version-env.js"
+  },
+  "dependencies": {
+    "yaml": "^2.8.1"
+  },
+  "engines": {
+    "node": ">=20.11.0"
+  }
+}
