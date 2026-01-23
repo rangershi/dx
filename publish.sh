@@ -1,11 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-REGISTRY="https://registry.npmjs.org"
+DEFAULT_REGISTRY="https://registry.npmjs.org"
+REGISTRY="${REGISTRY:-$DEFAULT_REGISTRY}"
 OTP=""
 
 print_help() {
-  cat <<'EOF'
+  cat <<EOF
 用法:
   ./publish.sh [选项]
 
@@ -20,7 +21,7 @@ print_help() {
 
 选项:
   -o, --otp <code>        2FA 一次性验证码（6 位）
-  -r, --registry <url>    npm registry（默认: https://registry.npmjs.org）
+  -r, --registry <url>    npm registry（默认: ${DEFAULT_REGISTRY}）
   -h, --help              显示帮助
 
 示例:
@@ -64,9 +65,9 @@ if [[ -n "$(git status --porcelain)" ]]; then
   exit 2
 fi
 
-if ! npm whoami --registry="$REGISTRY" >/dev/null 2>&1; then
-  echo "错误: 当前机器未登录 npm（registry: $REGISTRY）。" >&2
-  echo "请先执行: npm login --registry=$REGISTRY" >&2
+if ! npm whoami --registry="${REGISTRY}" >/dev/null 2>&1; then
+  echo "错误: 当前机器未登录 npm（registry: ${REGISTRY}）。" >&2
+  echo "请先执行: npm login --registry=${REGISTRY}" >&2
   exit 2
 fi
 
@@ -100,7 +101,7 @@ if [[ "$PKG_VERSION" == "0.0.0" ]]; then
   exit 2
 fi
 
-if npm view "${PKG_NAME}@${PKG_VERSION}" version --registry="$REGISTRY" >/dev/null 2>&1; then
+if npm view "${PKG_NAME}@${PKG_VERSION}" version --registry="${REGISTRY}" >/dev/null 2>&1; then
   echo "错误: ${PKG_NAME}@${PKG_VERSION} 已存在于 registry，拒绝覆盖发布。" >&2
   exit 2
 fi
@@ -123,4 +124,4 @@ if [[ -z "$OTP" ]]; then
   exit 2
 fi
 
-npm publish --access public --registry="$REGISTRY" --otp="$OTP"
+npm publish --access public --registry="${REGISTRY}" --otp="$OTP"
