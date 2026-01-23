@@ -1,6 +1,6 @@
 # dx
 
-一个可安装的 Node.js CLI，用于管理 ai-monorepo 类项目的构建/启动/数据库/部署等流程。
+一个可安装的 Node.js CLI，用于管理符合约定的 pnpm + nx monorepo 项目的构建/启动/数据库/部署等流程。
 
 ## 安装
 
@@ -76,7 +76,7 @@ dx test e2e backend
 
 ```json
 {
-  "command": "../../node_modules/.bin/dx-with-version-env --app front -- next build"
+  "command": "dx-with-version-env --app front -- next build"
 }
 ```
 
@@ -84,10 +84,11 @@ dx test e2e backend
 
 ## 约束与假设
 
-当前版本面向 ai-monorepo 类结构，默认假设：
+当前版本面向 pnpm + nx 的 monorepo，默认假设：
 
 - 使用 pnpm + nx
-- 项目布局包含 `apps/backend`、`apps/front`、`apps/admin-front`、`apps/sdk`
+- 项目布局包含 `apps/backend`、`apps/front`、`apps/admin-front`、`apps/sdk`（如果你的命令配置不依赖这些目录，可自行调整）
+- 版本注入脚本 `dx-with-version-env` 默认支持 app: `backend` / `front` / `admin`
 
 ## 发布到 npm（准备工作）
 
@@ -101,4 +102,3 @@ dx test e2e backend
 npm publish --access public --registry=https://registry.npmjs.org
 ```
 
-提示：当前仓库包含一个 `.npmrc`，用于确保 publish 走 npm 官方 registry（避免镜像源导致发布失败）。

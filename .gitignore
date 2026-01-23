@@ -7,3 +7,7 @@ dist/
 npm-debug.log*
 pnpm-debug.log*
 .npmrc
+/.idea/.gitignore
+/.idea/dx.iml
+/.idea/modules.xml
+/.idea/vcs.xml
