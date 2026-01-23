@@ -3,7 +3,8 @@ set -euo pipefail
 
 DEFAULT_REGISTRY="https://registry.npmjs.org"
 REGISTRY="${REGISTRY:-$DEFAULT_REGISTRY}"
-OTP=""
+TOKEN=""
+OTP="" # 可选：当账号强制要求 OTP 时使用
 
 print_help() {
   cat <<EOF
@@ -11,25 +12,30 @@ print_help() {
   ./publish.sh [选项]
 
 说明:
-  发布当前目录的 npm 包到 npm 官方仓库。
-  2FA 开启时需要 OTP。
+  使用 Granular Access Token 发布当前目录的 npm 包到 npm 官方仓库。
+  默认不需要 npm login；脚本会为本次发布临时注入 token（不会写入仓库文件）。
+  如果你的账号/包策略强制要求 2FA，仍可能需要提供 OTP。
 
 发布前置要求:
   - 当前目录必须是 git 仓库，且工作区干净（所有变更已提交）。
-  - 本机必须已 npm login。
+  - 必须提供可发布该包的 npm token（建议使用 Granular Access Token）。
   - package.json 中 name/version 必须可发布，且该 version 在 registry 中不存在。
 
 选项:
-  -o, --otp <code>        2FA 一次性验证码（6 位）
+  -t, --token <token>     npm token（推荐 Granular Access Token）
+  -o, --otp <code>        2FA 一次性验证码（6 位，可选）
   -r, --registry <url>    npm registry（默认: ${DEFAULT_REGISTRY}）
   -h, --help              显示帮助
 
 示例:
-  # 交互式输入 OTP（本机已 npm login）
+  # 交互式输入 token
   ./publish.sh
 
-  # 直接传 OTP
-  ./publish.sh --otp 123456
+  # 直接传 token
+  ./publish.sh --token "npm_xxx"
+
+  # 若 registry 策略要求 OTP
+  ./publish.sh --token "npm_xxx" --otp 123456
 EOF
 }
 
@@ -39,6 +45,8 @@ is_tty() {
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
+    -t|--token)
+      TOKEN="${2:-}"; shift 2 ;;
     -o|--otp)
       OTP="${2:-}"; shift 2 ;;
     -r|--registry)
@@ -65,9 +73,40 @@ if [[ -n "$(git status --porcelain)" ]]; then
   exit 2
 fi
 
-if ! npm whoami --registry="${REGISTRY}" >/dev/null 2>&1; then
-  echo "错误: 当前机器未登录 npm（registry: ${REGISTRY}）。" >&2
-  echo "请先执行: npm login --registry=${REGISTRY}" >&2
+umask 077
+TMP_NPMRC=""
+cleanup() {
+  if [[ -n "${TMP_NPMRC}" ]]; then
+    rm -f "${TMP_NPMRC}" >/dev/null 2>&1 || true
+  fi
+}
+trap cleanup EXIT
+
+if [[ -z "${TOKEN}" ]]; then
+  if is_tty; then
+    read -rs -p "请输入 NPM Token: " TOKEN
+    echo
+  else
+    echo "缺少 token，请使用 --token 传入。" >&2
+    echo >&2
+    print_help
+    exit 2
+  fi
+fi
+
+if [[ -z "${TOKEN}" ]]; then
+  echo "token 不能为空" >&2
+  exit 2
+fi
+
+TMP_NPMRC="$(mktemp -t npmrc.dx-publish.XXXXXX)"
+cat >"${TMP_NPMRC}" <<EOF
+registry=${REGISTRY}
+//registry.npmjs.org/:_authToken=${TOKEN}
+EOF
+
+if ! NPM_CONFIG_USERCONFIG="${TMP_NPMRC}" npm whoami --registry="${REGISTRY}" >/dev/null 2>&1; then
+  echo "错误: token 无效或无权限（registry: ${REGISTRY}）。" >&2
   exit 2
 fi
 
@@ -101,27 +140,13 @@ if [[ "$PKG_VERSION" == "0.0.0" ]]; then
   exit 2
 fi
 
-if npm view "${PKG_NAME}@${PKG_VERSION}" version --registry="${REGISTRY}" >/dev/null 2>&1; then
+if NPM_CONFIG_USERCONFIG="${TMP_NPMRC}" npm view "${PKG_NAME}@${PKG_VERSION}" version --registry="${REGISTRY}" >/dev/null 2>&1; then
   echo "错误: ${PKG_NAME}@${PKG_VERSION} 已存在于 registry，拒绝覆盖发布。" >&2
   exit 2
 fi
 
-if [[ -z "$OTP" ]]; then
-  if is_tty; then
-    read -r -p "请输入 OTP(6位): " OTP
-  else
-    echo "缺少 OTP，请使用 --otp 传入。" >&2
-    echo >&2
-    print_help
-    exit 2
-  fi
+if [[ -n "${OTP}" ]]; then
+  NPM_CONFIG_USERCONFIG="${TMP_NPMRC}" npm publish --access public --registry="${REGISTRY}" --otp="${OTP}"
+else
+  NPM_CONFIG_USERCONFIG="${TMP_NPMRC}" npm publish --access public --registry="${REGISTRY}"
 fi
-
-if [[ -z "$OTP" ]]; then
-  echo "OTP 不能为空" >&2
-  echo >&2
-  print_help
-  exit 2
-fi
-
-npm publish --access public --registry="${REGISTRY}" --otp="$OTP"
