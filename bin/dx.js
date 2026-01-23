@@ -43,24 +43,60 @@ function findProjectRootFrom(startDir) {
   }
 }
 
+function findRepoRootFrom(startDir) {
+  let current = resolve(startDir)
+  while (true) {
+    // ai-monorepo style marker
+    if (existsSync(join(current, 'pnpm-workspace.yaml'))) return current
+    // fallback marker
+    if (existsSync(join(current, 'package.json'))) return current
+
+    const parent = dirname(current)
+    if (parent === current) return null
+    current = parent
+  }
+}
+
+function inferProjectRootFromConfigDir(configDir, startDir) {
+  const normalized = String(configDir).replace(/\\/g, '/')
+  if (normalized.endsWith('/dx/config')) return resolve(configDir, '..', '..')
+  if (normalized.endsWith('/scripts/config')) return resolve(configDir, '..', '..')
+
+  return findRepoRootFrom(configDir) || findRepoRootFrom(startDir) || resolve(startDir)
+}
+
 async function main() {
   const rawArgs = process.argv.slice(2)
   const overrideConfigDir = parseConfigDir(rawArgs)
   const filteredArgs = stripConfigDirArgs(rawArgs)
 
   const startDir = process.cwd()
-  const projectRoot = findProjectRootFrom(startDir)
-  if (!projectRoot) {
-    console.error('dx: 未找到项目配置目录: dx/config/commands.json')
-    console.error('dx: 请在项目目录内执行 dx，或先创建 dx/config 并放置 commands.json')
-    console.error('dx: 也可通过 DX_CONFIG_DIR 或 --config-dir 指定配置目录')
-    process.exit(1)
+  let projectRoot
+  let configDir
+
+  if (overrideConfigDir) {
+    // When dx is installed globally, users may prefer providing DX_CONFIG_DIR/--config-dir.
+    // In that case, do not require dx/config marker discovery.
+    configDir = resolve(startDir, overrideConfigDir)
+    if (!existsSync(join(configDir, 'commands.json'))) {
+      console.error(`dx: 配置目录无效: ${configDir}`)
+      console.error('dx: 期望存在 commands.json')
+      process.exit(1)
+    }
+    projectRoot = inferProjectRootFromConfigDir(configDir, startDir)
+  } else {
+    projectRoot = findProjectRootFrom(startDir)
+    if (!projectRoot) {
+      console.error('dx: 未找到项目配置目录: dx/config/commands.json')
+      console.error('dx: 请在项目目录内执行 dx，或先创建 dx/config 并放置 commands.json')
+      console.error('dx: 也可通过 DX_CONFIG_DIR 或 --config-dir 指定配置目录')
+      process.exit(1)
+    }
+    configDir = join(projectRoot, 'dx', 'config')
   }
 
   process.env.DX_PROJECT_ROOT = projectRoot
-
-  const defaultConfigDir = join(projectRoot, 'dx', 'config')
-  process.env.DX_CONFIG_DIR = overrideConfigDir ? resolve(projectRoot, overrideConfigDir) : defaultConfigDir
+  process.env.DX_CONFIG_DIR = configDir
 
   process.chdir(projectRoot)
 

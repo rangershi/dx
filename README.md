@@ -4,25 +4,24 @@
 
 ## 安装
 
-项目内安装（推荐）：
+全局安装（推荐）：
 
 ```bash
-pnpm add -D dx
+pnpm add -g @ranger1/dx
 ```
 
-使用：
+安装后即可在任意目录使用：
 
 ```bash
-pnpm exec dx --help
-pnpm exec dx status
-pnpm exec dx build sdk --dev
-```
-
-也可以全局安装：
-
-```bash
-pnpm add -g dx
 dx --help
+dx status
+```
+
+项目内安装（可选，如果你更希望锁定版本）：
+
+```bash
+pnpm add -D @ranger1/dx
+pnpm exec dx --help
 ```
 
 ## 项目配置（必须）
@@ -45,6 +44,8 @@ dx/
 
 - 环境变量：`DX_CONFIG_DIR=/abs/path/to/config`
 - 参数：`dx --config-dir /abs/path/to/config ...`
+
+全局安装场景下，如果你不在项目目录内执行，也可以通过 `DX_CONFIG_DIR` / `--config-dir` 显式指定配置目录（目录下需要存在 `commands.json`）。
 
 ## 命令
 
