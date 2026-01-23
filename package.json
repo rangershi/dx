@@ -1,11 +1,29 @@
 {
-  "name": "dx",
-  "version": "0.0.0",
-  "private": true,
+  "name": "@ranger1/dx",
+  "version": "0.1.0",
   "type": "module",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+ssh://git@github.com/rangershi/dx.git"
+  },
+  "bugs": {
+    "url": "https://github.com/rangershi/dx/issues"
+  },
+  "homepage": "https://github.com/rangershi/dx#readme",
   "bin": {
-    "dx": "./bin/dx.js",
-    "dx-with-version-env": "./bin/dx-with-version-env.js"
+    "dx": "bin/dx.js",
+    "dx-with-version-env": "bin/dx-with-version-env.js"
+  },
+  "files": [
+    "bin/",
+    "lib/",
+    "LICENSE",
+    "README.md",
+    "package.json"
+  ],
+  "publishConfig": {
+    "access": "public"
   },
   "dependencies": {
     "yaml": "^2.8.1"
