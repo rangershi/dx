@@ -1,5 +1,9 @@
-import { describe, it, expect, beforeEach } from '@jest/globals'
+import { describe, it, expect, beforeEach, jest } from '@jest/globals'
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs'
+import { join } from 'node:path'
+import { tmpdir } from 'node:os'
 import {
+  loadEnvPolicy,
   validateEnvPolicy,
   resolvePolicyTargetId,
   resolveTargetRequiredVars,
@@ -50,6 +54,50 @@ const validPolicy = {
     },
   },
 }
+
+describe('loadEnvPolicy (JSONC comment support)', () => {
+  it('should parse env-policy.jsonc that contains // and /* */ comments', () => {
+    // env-policy.jsonc is JSONC in practice; dx strips comments before JSON.parse.
+    // This test ensures comment support does not regress.
+    const root = mkdtempSync(join(tmpdir(), 'dx-env-policy-jsonc-'))
+    try {
+      const configDir = join(root, 'dx', 'config')
+      mkdirSync(configDir, { recursive: true })
+
+      const policyJsonc = `// top comment\n{
+  /* block comment */
+  "version": 1,
+  "environments": ["development"],
+  "layout": {
+    "forbidExact": [".env"],
+    "allowRoot": [".env.{env}", ".env.{env}.local"],
+    "allowSubdirGlobs": []
+  },
+  "secretPlaceholder": "__SET_IN_env.local__",
+  "keys": { "secret": [], "localOnly": [], "localOverride": [] },
+  "appToTarget": { "backend": "backend" },
+  "targets": {
+    "backend": {
+      "files": { "committed": ".env.{env}", "local": ".env.{env}.local" },
+      "required": { "_common": [], "development": [] }
+    }
+  }
+}\n`
+
+      writeFileSync(join(configDir, 'env-policy.jsonc'), policyJsonc)
+
+      // Ensure no cross-test configDir caching confusion.
+      jest.resetModules()
+
+      const loaded = loadEnvPolicy(configDir)
+      expect(loaded).toBeTruthy()
+      expect(loaded.version).toBe(1)
+      expect(Array.isArray(loaded.environments)).toBe(true)
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
+  })
+})
 
 describe('validateEnvPolicy', () => {
   describe('version validation', () => {

@@ -1,16 +1,53 @@
 {
+  // Env Policy (JSONC)
+  //
+  // This file is JSONC (JSON with comments). dx supports both:
+  // - // line comments
+  // - /* block comments */
+  //
+  // Goals:
+  // 1) Enforce .env file layout (which files are allowed/forbidden)
+  // 2) Prevent secrets from being committed (committed files use placeholders)
+  // 3) Validate required keys before running commands
+  //
+  // Token syntax:
+  // - {env} will be replaced with the environment name from `environments`
+
   "version": 1,
+
+  // Which environments dx should validate for.
+  // Common values: development / staging / production / test / e2e
   "environments": ["development", "production"],
 
   "layout": {
+    // These exact filenames are forbidden at the project root.
+    // Rationale: .env and .env.local are ambiguous; we require explicit env-scoped files.
     "forbidExact": [".env", ".env.local"],
+
+    // Root-level env files that are allowed.
+    // Typically:
+    // - committed template:   .env.{env}
+    // - uncommitted local:    .env.{env}.local
     "allowRoot": [".env.{env}", ".env.{env}.local"],
+
+    // Allow env files under sub-directories, but only for explicit exceptions.
+    // NOTE: dx currently implements a very simple glob:
+    // - exact match (no '*')
+    // - prefix match when pattern ends with '*'
+    // So "docker/.env*" allows docker/.env, docker/.env.example, docker/.env.foo, etc.
     "allowSubdirGlobs": ["docker/.env*"]
   },
 
+
+  // Placeholder token that MUST appear in committed files for secret keys.
+  // This makes it obvious that the real value must be set in `.env.{env}.local`.
   "secretPlaceholder": "__SET_IN_env.local__",
 
   "keys": {
+    // Secret keys:
+    // - MUST exist in committed `.env.{env}` files
+    // - In committed files, values MUST equal `secretPlaceholder`
+    // - In local files, values MUST be real (not placeholder)
     "secret": [
       "APP_SECRET",
       "DATABASE_URL",
@@ -18,11 +55,21 @@
       "S3_SECRET_KEY",
       "OPENAI_API_KEY"
     ],
+
+    // localOnly keys:
+    // - Can exist only in `.env.{env}.local`
+    // - Must NOT appear in committed env files or `.env.example`
     "localOnly": [],
+
+    // localOverride keys:
+    // - Allowed in `.env.{env}.local`
+    // - May also appear in committed files (local value overrides)
     "localOverride": []
   },
 
   "appToTarget": {
+    // commands.json may set `app` (e.g. backend/front/admin-front).
+    // This map resolves that app to a target defined in `targets`.
     "backend": "backend",
     "front": "frontend",
     "admin-front": "frontend"
@@ -30,9 +77,16 @@
 
   "targets": {
     "backend": {
+      // File templates for this target.
+      // dx will validate both files per environment by replacing {env}.
       "files": { "committed": ".env.{env}", "local": ".env.{env}.local" },
       "required": {
+        // Required keys for all environments.
         "_common": ["APP_ENV"],
+
+        // Required keys per environment.
+        // For secrets, it's OK if the committed file uses the placeholder,
+        // but dx will still require the runtime effective env to not be placeholder.
         "development": ["DATABASE_URL", "APP_SECRET"],
         "production": ["DATABASE_URL", "APP_SECRET"]
       }
@@ -40,6 +94,8 @@
     "frontend": {
       "files": { "committed": ".env.{env}", "local": ".env.{env}.local" },
       "required": {
+        // Frontend apps usually require public env keys.
+        // Use the key names that your framework actually reads.
         "_common": ["NEXT_PUBLIC_APP_ENV", "VITE_APP_ENV"],
         "development": [],
         "production": []

@@ -35,6 +35,8 @@ afterEach(() => {
  * Helper: Create minimal env-policy.jsonc with overrides
  */
 function createMinimalPolicy(root, overrides = {}) {
+  // NOTE: We write pure JSON here for convenience.
+  // `env-policy.jsonc` supports comments (JSONC) and dx will strip them before parsing.
   const policy = {
     version: 1,
     environments: overrides.environments || ['development', 'production'],
