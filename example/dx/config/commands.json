@@ -1,0 +1,119 @@
+{
+  "start": {
+    "backend": {
+      "command": "npx nx dev backend",
+      "app": "backend",
+      "ports": [3000],
+      "description": "启动后端开发服务"
+    },
+    "front": {
+      "command": "npx nx dev front",
+      "app": "front",
+      "ports": [3001],
+      "description": "启动前端开发服务"
+    },
+    "all": {
+      "concurrent": true,
+      "commands": ["start.backend", "start.front"],
+      "description": "并发启动 backend/front"
+    }
+  },
+  "build": {
+    "backend": {
+      "dev": {
+        "command": "npx nx build backend --configuration=development",
+        "app": "backend",
+        "description": "构建后端(开发环境)"
+      },
+      "prod": {
+        "command": "npx nx build backend --configuration=production",
+        "app": "backend",
+        "description": "构建后端(生产环境)"
+      }
+    },
+    "front": {
+      "dev": {
+        "command": "npx nx build front --configuration=development",
+        "app": "front",
+        "description": "构建前端(开发环境)"
+      },
+      "prod": {
+        "command": "npx nx build front --configuration=production",
+        "app": "front",
+        "description": "构建前端(生产环境)"
+      }
+    },
+    "all": {
+      "dev": {
+        "concurrent": true,
+        "commands": ["build.backend.dev", "build.front.dev"],
+        "description": "并发构建 backend/front(开发环境)"
+      },
+      "prod": {
+        "concurrent": true,
+        "commands": ["build.backend.prod", "build.front.prod"],
+        "description": "并发构建 backend/front(生产环境)"
+      }
+    }
+  },
+  "db": {
+    "generate": {
+      "command": "npx nx prisma:generate backend",
+      "app": "backend",
+      "description": "生成 Prisma Client"
+    },
+    "migrate": {
+      "dev": {
+        "command": "npx nx prisma:migrate:dev backend",
+        "app": "backend",
+        "description": "创建迁移(开发环境)"
+      },
+      "prod": {
+        "command": "npx nx prisma:migrate:deploy backend",
+        "app": "backend",
+        "dangerous": true,
+        "description": "应用迁移(生产环境)"
+      }
+    },
+    "deploy": {
+      "dev": {
+        "command": "npx nx prisma:migrate:deploy backend",
+        "app": "backend",
+        "description": "应用迁移(开发环境)"
+      },
+      "prod": {
+        "command": "npx nx prisma:migrate:deploy backend",
+        "app": "backend",
+        "dangerous": true,
+        "description": "应用迁移(生产环境)"
+      }
+    }
+  },
+  "deploy": {
+    "front": {
+      "description": "部署前端（示例占位，具体实现可在项目侧扩展）"
+    }
+  },
+  "install": {
+    "command": "pnpm install --frozen-lockfile",
+    "description": "安装依赖"
+  },
+  "lint": {
+    "command": "npx nx lint",
+    "description": "运行 lint"
+  },
+  "clean": {
+    "all": {
+      "command": "rm -rf node_modules dist",
+      "dangerous": true,
+      "description": "清理依赖与产物"
+    }
+  },
+  "cache": {
+    "clear": {
+      "command": "npx nx reset",
+      "dangerous": true,
+      "description": "清理 Nx 缓存"
+    }
+  }
+}

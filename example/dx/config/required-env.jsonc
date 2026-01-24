@@ -1,0 +1,22 @@
+{
+  // 所有命令都会校验
+  "_common": [
+    "APP_ENV"
+  ],
+
+  // 当命令配置里 app=backend 时会校验
+  "backend": [
+    "DATABASE_URL",
+    "APP_SECRET"
+  ],
+
+  // 当命令配置里 app=front/admin-front 等前端应用时会校验
+  "frontend": [
+    "NEXT_PUBLIC_APP_ENV",
+    "VITE_APP_ENV"
+  ],
+
+  // 按环境补充（可选）
+  "development": [],
+  "production": []
+}
