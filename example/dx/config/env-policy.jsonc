@@ -1,0 +1,49 @@
+{
+  "version": 1,
+  "environments": ["development", "production"],
+
+  "layout": {
+    "forbidExact": [".env", ".env.local"],
+    "allowRoot": [".env.{env}", ".env.{env}.local"],
+    "allowSubdirGlobs": ["docker/.env*"]
+  },
+
+  "secretPlaceholder": "__SET_IN_env.local__",
+
+  "keys": {
+    "secret": [
+      "APP_SECRET",
+      "DATABASE_URL",
+      "REDIS_URL",
+      "S3_SECRET_KEY",
+      "OPENAI_API_KEY"
+    ],
+    "localOnly": [],
+    "localOverride": []
+  },
+
+  "appToTarget": {
+    "backend": "backend",
+    "front": "frontend",
+    "admin-front": "frontend"
+  },
+
+  "targets": {
+    "backend": {
+      "files": { "committed": ".env.{env}", "local": ".env.{env}.local" },
+      "required": {
+        "_common": ["APP_ENV"],
+        "development": ["DATABASE_URL", "APP_SECRET"],
+        "production": ["DATABASE_URL", "APP_SECRET"]
+      }
+    },
+    "frontend": {
+      "files": { "committed": ".env.{env}", "local": ".env.{env}.local" },
+      "required": {
+        "_common": ["NEXT_PUBLIC_APP_ENV", "VITE_APP_ENV"],
+        "development": [],
+        "production": []
+      }
+    }
+  }
+}
