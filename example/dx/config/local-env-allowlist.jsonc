@@ -1,7 +1,0 @@
-[
-  "APP_SECRET",
-  "DATABASE_URL",
-  "REDIS_URL",
-  "S3_SECRET_KEY",
-  "OPENAI_API_KEY"
-]

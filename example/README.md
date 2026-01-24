@@ -16,9 +16,7 @@ example/
     config/
       commands.json
       env-layers.json
-      required-env.jsonc
-      local-env-allowlist.jsonc
-      exempted-keys.jsonc
+      env-policy.jsonc
   .env.development
   .env.development.local
   .env.production
@@ -92,12 +90,11 @@ dx 的命令配置是一个 JSON 对象（不是代码）。通常会按命令�
 
 dx 会按顺序加载，并在执行命令时用 `pnpm exec dotenv ... -- <cmd>` 包裹（因此项目里需要安装 `dotenv-cli`）。
 
-## required-env.jsonc / allowlist
+## env-policy.jsonc
 
-- `required-env.jsonc` 定义“必须存在”的 env key
-- `local-env-allowlist.jsonc` 定义哪些 key 允许出现在 `.env.*.local`（机密文件）
+`env-policy.jsonc` 是统一的 env 策略配置：
 
-规则要点：
+- 机密 key：只能在 `.env.<env>.local` 放真实值；在 `.env.<env>` 中必须存在同名 key 且为占位符 `__SET_IN_env.local__`
+- 必填校验：按环境 + 按 target（端）定义 required keys
 
-- 非 local 文件（例如 `.env.production`）里，机密 key 必须写占位符：`__SET_IN_env.local__`
-- 真实值只能放在 `.env.*.local`
+示例配置见 `example/dx/config/env-policy.jsonc`。

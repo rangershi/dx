@@ -47,9 +47,7 @@ dx/
   config/
     commands.json
     env-layers.json
-    required-env.jsonc
-    local-env-allowlist.jsonc
-    exempted-keys.jsonc
+    env-policy.jsonc
 ```
 
 可选覆盖：
@@ -115,25 +113,17 @@ DX_CONFIG_DIR=/path/to/your-repo/dx/config dx status
 }
 ```
 
-### 3) dx/config/required-env.jsonc
+### 3) dx/config/env-policy.jsonc
 
-用于定义哪些环境变量是「必须存在」的（dx 会在执行命令前校验）。它是 jsonc（允许 // 注释）。
+统一的 env 策略配置（jsonc），同时覆盖：
 
-dx 的校验分组逻辑：
+- env 文件布局约束（禁用 `.env` / `.env.local`；禁止子目录散落 `.env*`，仅允许少数特例路径）
+- 机密键策略：机密 key 只能在 `.env.<env>.local` 放真实值；对应的 `.env.<env>` 必须存在同名 key 且为占位符 `__SET_IN_env.local__`
+- 必填校验：按环境 + 按 target（端）定义 required keys，执行命令前校验是否缺失/仍为占位符
 
-- `_common`: 所有命令都会校验
-- `backend`: 当命令配置里 `app` 是 `backend` 时会校验
-- `frontend`: 当命令配置里 `app` 是 `front`/`admin-front` 等前端应用时会校验
-- `development`/`production`/`staging`/`test`/`e2e`: 按当前环境额外补充
+target（端）不写死，由 `env-policy.jsonc.targets` 定义；`commands.json` 里的 `app` 通过 `env-policy.jsonc.appToTarget` 映射到某个 target。
 
-### 4) dx/config/local-env-allowlist.jsonc + exempted-keys.jsonc
-
-这是为了防止误提交机密：
-
-- `local-env-allowlist.jsonc`：允许出现在 `.env.*.local` 里的键（这些被认为是“机密”）
-- `exempted-keys.jsonc`：豁免键（允许在非 local 文件中出现真实值）
-
-非 local 的 `.env.*` 文件里，机密键必须使用占位符：`__SET_IN_env.local__`。
+注：若未提供 `env-policy.jsonc`，dx 会继续使用旧的 `required-env.jsonc` / `local-env-allowlist.jsonc` / `exempted-keys.jsonc` 逻辑（兼容模式）。
 
 ## 示例工程
 
