@@ -31,6 +31,33 @@ function stripConfigDirArgs(argv) {
   return out
 }
 
+function isVersionInvocation(argv) {
+  const raw = Array.isArray(argv) ? argv : []
+  const filtered = stripConfigDirArgs(raw)
+
+  const flags = []
+  const positionals = []
+  for (const token of filtered) {
+    if (token === '--') break
+    if (token.startsWith('-')) flags.push(token)
+    else positionals.push(token)
+  }
+
+  // Keep current semantics:
+  // - -V/--version always prints version and exits.
+  // - -v is verbose in commands, but `dx -v` is commonly expected to show version.
+  const hasCanonicalVersionFlag = flags.includes('-V') || flags.includes('--version')
+  if (hasCanonicalVersionFlag) return true
+
+  const isBareLowerV = flags.length === 1 && flags[0] === '-v' && positionals.length === 0
+  if (isBareLowerV) return true
+
+  const isVersionCommand = positionals.length === 1 && positionals[0] === 'version'
+  if (isVersionCommand) return true
+
+  return false
+}
+
 function findProjectRootFrom(startDir) {
   let current = resolve(startDir)
   while (true) {
@@ -67,6 +94,13 @@ function inferProjectRootFromConfigDir(configDir, startDir) {
 
 async function main() {
   const rawArgs = process.argv.slice(2)
+
+  if (isVersionInvocation(rawArgs)) {
+    const { getPackageVersion } = await import('../lib/version.js')
+    console.log(getPackageVersion())
+    return
+  }
+
   const overrideConfigDir = parseConfigDir(rawArgs)
   const filteredArgs = stripConfigDirArgs(rawArgs)
 
