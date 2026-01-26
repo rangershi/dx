@@ -6,10 +6,10 @@
 
 ## 安装
 
-全局安装（推荐）：
+必须全局安装，并始终使用最新版本：
 
 ```bash
-pnpm add -g @ranger1/dx
+pnpm add -g @ranger1/dx@latest
 ```
 
 安装后即可在任意目录使用：
@@ -19,11 +19,10 @@ dx --help
 dx status
 ```
 
-项目内安装（可选，如果你更希望锁定版本）：
+升级到最新版本：
 
 ```bash
-pnpm add -D @ranger1/dx
-pnpm exec dx --help
+pnpm update -g @ranger1/dx
 ```
 
 ## 使用条件（必须满足）
@@ -32,7 +31,7 @@ pnpm exec dx --help
 - 包管理器：pnpm（dx 内部会调用 `pnpm`）
 - 构建系统：Nx（dx 默认命令配置里大量使用 `npx nx ...`）
 - 环境加载：建议项目依赖 `dotenv-cli`（dx 会用 `pnpm exec dotenv ...` 包裹命令来注入 `.env.*`）
-- 项目结构：默认按 `apps/backend` / `apps/front` / `apps/admin-front` / `apps/sdk` 这类布局编写命令配置
+- 项目结构：推荐按 `apps/backend` / `apps/front` / `apps/admin-front` 这类布局组织；如有自定义目录结构，请通过 `dx/config/commands.json` 适配
 
 如果你的 monorepo 不完全一致，也能用：关键是你在 `dx/config/commands.json` 里把命令写成适配你项目的形式。
 
@@ -159,6 +158,15 @@ dx test e2e backend
 - 需要的前置构建（例如 `shared`、`api-contracts`、OpenAPI 导出、后端构建等）应由项目自己的 Nx 依赖图（`dependsOn`/项目依赖）或 Vercel 的 `buildCommand` 负责。
 - 这样 dx deploy 不会强依赖 `apps/sdk` 等目录结构，更容易适配不同 monorepo。
 
+## 依赖关系约定
+
+dx 不负责管理「工程之间的构建依赖关系」。如果多个工程之间存在依赖（例如 `front/admin` 依赖 `shared` 或 `api-contracts`），必须由 Nx 的依赖图来表达并自动拉起：
+
+- 使用 Nx 的项目依赖（基于 import graph 或 `implicitDependencies`）
+- 使用 `nx.json` 的 `targetDefaults.dependsOn` / `targetDependencies`
+
+dx 只会执行你在 `dx/config/commands.json` 中配置的命令，不会在执行过程中额外硬编码插入依赖构建。
+
 ## 给 Nx target 注入版本信息（可选）
 
 本包提供 `dx-with-version-env`，用于在 `nx:run-commands` 中注入版本/sha/构建时间等环境变量：
@@ -176,7 +184,7 @@ dx test e2e backend
 当前版本面向 pnpm + nx 的 monorepo，默认假设：
 
 - 使用 pnpm + nx
-- 项目布局包含 `apps/backend`、`apps/front`、`apps/admin-front`、`apps/sdk`（如果你的命令配置不依赖这些目录，可自行调整）
+- 项目布局包含 `apps/backend`、`apps/front`、`apps/admin-front`（如有差异，通过 `dx/config/commands.json` 适配）
 - 版本注入脚本 `dx-with-version-env` 默认支持 app: `backend` / `front` / `admin`
 
 ## 发布到 npm（准备工作）
