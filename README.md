@@ -152,6 +152,13 @@ dx lint
 dx test e2e backend
 ```
 
+## deploy 行为说明
+
+从 `0.1.9` 起，`dx deploy <target>` 不再在 dx 内部硬编码执行任何 `nx build`/`sdk build` 等前置步骤。
+
+- 需要的前置构建（例如 `shared`、`api-contracts`、OpenAPI 导出、后端构建等）应由项目自己的 Nx 依赖图（`dependsOn`/项目依赖）或 Vercel 的 `buildCommand` 负责。
+- 这样 dx deploy 不会强依赖 `apps/sdk` 等目录结构，更容易适配不同 monorepo。
+
 ## 给 Nx target 注入版本信息（可选）
 
 本包提供 `dx-with-version-env`，用于在 `nx:run-commands` 中注入版本/sha/构建时间等环境变量：
