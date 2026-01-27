@@ -1,0 +1,215 @@
+{
+  "version": 1,
+  "environments": ["development", "staging", "production", "test", "e2e"],
+
+  "layout": {
+    "forbidExact": [".env", ".env.local"],
+    "allowRoot": [".env.{env}", ".env.{env}.local"],
+    "allowSubdirGlobs": ["docker/.env*", ".vercel/.env*"]
+  },
+
+  "secretPlaceholder": "__SET_IN_env.local__",
+
+  "keys": {
+    // 真正的敏感密钥：必须在 .env.{env} 中使用占位符，仅在 .env.{env}.local 中存放真实值
+    "secret": [
+      // 数据库
+      "POSTGRES_HOST",
+      "POSTGRES_USER",
+      "POSTGRES_PASSWORD",
+      "POSTGRES_PORT",
+      "DATABASE_URL",
+
+      // Redis
+      "REDIS_HOST",
+      "REDIS_PORT",
+      "REDIS_PASSWORD",
+      "REDIS_URL",
+      "REDIS_DB",
+
+      // 认证密钥
+      "JWT_SECRET",
+      "APP_SECRET",
+
+      // 对象存储
+      "S3_ACCESS_KEY",
+      "S3_SECRET_ID",
+      "S3_SECRET_KEY",
+      "S3_BUCKET_NAME",
+      "S3_REGION",
+      "S3_ENDPOINT",
+      "S3_CDN_DOMAIN",
+      "S3_PRESIGNED_URL_EXPIRATION",
+
+      // OAuth
+      "GOOGLE_CLIENT_ID",
+      "GOOGLE_CLIENT_SECRET",
+      "DISCORD_CLIENT_ID",
+      "DISCORD_CLIENT_SECRET",
+
+      // Telegram Bot（敏感部分）
+      "TELEGRAM_BOT_TOKEN",
+      "TELEGRAM_BOT_WEBHOOK_SECRET",
+
+      // 邮件服务
+      "RESEND_API_KEY",
+
+      // 服务间认证
+      "BACKEND_API_KEY",
+      "SUPABASE_SERVICE_KEY",
+
+      // AI 模型 API Keys
+      "OPENAI_COMPATIBLE_API_KEY",
+      "OPENAI_COMPATIBLE_BASE_URL",
+
+      // Vercel 部署 Token（敏感）
+      "VERCEL_TOKEN"
+    ],
+
+    // 仅存在于 .local 文件的键（机器特定，从不提交）
+    "localOnly": ["LOG_CONTEXT_FILTER"],
+
+    // 可在 .env.{env} 设置默认值，但允许在 .local 覆盖
+    "localOverride": [
+      // Seed 配置（可在不同环境设置不同默认值）
+      "SEED_INIT_WALLET_BALANCE",
+
+      // 日志级别（允许本地覆盖）
+      "LOG_LEVEL",
+
+      // Vercel 部署配置（非敏感，允许覆盖）
+      "VERCEL_ORG_ID",
+      "VERCEL_PROJECT_ID_FRONT",
+      "VERCEL_PROJECT_ID_ADMIN",
+      "VERCEL_PROJECT_ID_TELEGRAM_BOT",
+      "VERCEL_GIT_COMMIT_AUTHOR_EMAIL",
+
+      // Metrics 配置（非敏感，允许覆盖）
+      "METRICS_ENABLED",
+      "METRICS_PROMETHEUS_PORT",
+      "METRICS_PROMETHEUS_ENDPOINT",
+      "METRICS_SERVICE_NAME",
+      "METRICS_SERVICE_VERSION",
+
+      // Telegram 登录配置（公开信息，允许覆盖）
+      "TELEGRAM_LOGIN_BOT_NAME",
+      "NEXT_PUBLIC_TELEGRAM_LOGIN_BOT_NAME",
+      "NEXT_PUBLIC_TELEGRAM_BOT_ID",
+      "TELEGRAM_PRIMARY_DOMAIN",
+      "NEXT_PUBLIC_PRIMARY_DOMAIN",
+
+      // Telegram Bot 应用配置（非敏感，允许覆盖）
+      "TELEGRAM_BOT_RECHARGE_URL",
+      "TELEGRAM_BOT_ENABLE_PRIVATE",
+      "TELEGRAM_BOT_ENABLE_GROUP",
+      "TELEGRAM_BOT_DEFAULT_MODEL",
+      "TELEGRAM_BOT_SESSION_TTL",
+      "TELEGRAM_BOT_RATE_LIMIT",
+
+      // 消息总线配置（非敏感，允许覆盖）
+      "MESSAGEBUS_OUTBOX_DISABLED"
+    ]
+  },
+
+  "appToTarget": {
+    "backend": "backend",
+    "front": "frontend",
+    "admin-front": "frontend",
+    "telegram-bot": "telegram-bot"
+  },
+
+  "targets": {
+    "backend": {
+      "files": {
+        "committed": ".env.{env}",
+        "local": ".env.{env}.local"
+      },
+      "required": {
+        "_common": [
+          "APP_ENV",
+          "LOG_LEVEL",
+          "APP_SECRET",
+          "DATABASE_URL",
+          "DISCORD_CLIENT_ID",
+          "DISCORD_CLIENT_SECRET",
+          "EMAIL_FROM",
+          "EMAIL_FROM_NAME",
+          "GOOGLE_CLIENT_ID",
+          "GOOGLE_CLIENT_SECRET",
+          "JWT_ACCESS_EXPIRATION",
+          "JWT_EXPIRES_IN",
+          "JWT_SECRET",
+          "POSTGRES_HOST",
+          "POSTGRES_PASSWORD",
+          "POSTGRES_PORT",
+          "POSTGRES_USER",
+          "REDIS_DB",
+          "REDIS_HOST",
+          "REDIS_PASSWORD",
+          "REDIS_PORT",
+          "REDIS_URL",
+          "RESEND_API_KEY",
+          "S3_ACCESS_KEY",
+          "S3_BUCKET_NAME",
+          "S3_CDN_DOMAIN",
+          "S3_ENDPOINT",
+          "S3_PRESIGNED_URL_EXPIRATION",
+          "S3_REGION",
+          "S3_SECRET_ID",
+          "S3_SECRET_KEY",
+          "TELEGRAM_BOT_TOKEN"
+        ],
+        "development": [
+          "EMAIL_TEST_MODE",
+          "ENGAGEMENT_DEDUPE_TTL_SEC",
+          "MESSAGEBUS_BACKOFF_DELAY_MS",
+          "OAUTH_CALLBACK_TOKEN_STRATEGY",
+          "TEST_LOG_LEVEL",
+          "THROTTLE_LIMIT",
+          "THROTTLE_REDIS_ENABLE",
+          "THROTTLE_TTL"
+        ],
+        "staging": [],
+        "production": [
+          "ENGAGEMENT_DEDUPE_TTL_SEC",
+          "MESSAGEBUS_BACKOFF_DELAY_MS",
+          "OAUTH_CALLBACK_TOKEN_STRATEGY",
+          "TEST_LOG_LEVEL",
+          "THROTTLE_LIMIT",
+          "THROTTLE_REDIS_ENABLE",
+          "THROTTLE_TTL"
+        ],
+        "test": ["OAUTH_CALLBACK_TOKEN_STRATEGY"],
+        "e2e": ["THROTTLE_LIMIT", "THROTTLE_REDIS_ENABLE", "THROTTLE_TTL"]
+      }
+    },
+    "frontend": {
+      "files": {
+        "committed": ".env.{env}",
+        "local": ".env.{env}.local"
+      },
+      "required": {
+        "_common": ["NEXT_PUBLIC_APP_ENV", "VITE_APP_ENV"],
+        "development": [],
+        "staging": [],
+        "production": [],
+        "test": [],
+        "e2e": []
+      }
+    },
+    "telegram-bot": {
+      "files": {
+        "committed": ".env.{env}",
+        "local": ".env.{env}.local"
+      },
+      "required": {
+        "_common": ["APP_ENV", "TELEGRAM_BOT_TOKEN", "BACKEND_API_URL", "BACKEND_API_KEY"],
+        "development": [],
+        "staging": [],
+        "production": [],
+        "test": [],
+        "e2e": []
+      }
+    }
+  }
+}

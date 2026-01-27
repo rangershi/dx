@@ -112,7 +112,8 @@ describe('dx ai command', () => {
       ]),
     )
 
-    // Last arg is prompt text content
+    // Prompt content is passed after `--` to prevent yargs from parsing it as flags.
+    expect(args[args.length - 2]).toBe('--')
     expect(args[args.length - 1]).toContain('Hello from prompt')
     expect(args[args.length - 1]).toContain('Second line')
 
@@ -212,6 +213,7 @@ describe('dx ai command', () => {
     await handleAi(cli, ['x'])
     const [_cmd, args] = spawnMock.mock.calls[0]
     expect(args).toEqual(expect.arrayContaining(['--share']))
+    expect(args[args.length - 2]).toBe('--')
     expect(args[args.length - 1]).toContain('dev prompt')
   })
 
@@ -237,6 +239,7 @@ describe('dx ai command', () => {
 
     await handleAi(cli, ['x'])
     const [_cmd, args] = spawnMock.mock.calls[0]
+    expect(args[args.length - 2]).toBe('--')
     expect(args[args.length - 1]).toContain('home prompt')
 
     // best-effort cleanup
@@ -263,6 +266,7 @@ describe('dx ai command', () => {
 
     await handleAi(cli, ['pr'])
     const [_cmd, args] = spawnMock.mock.calls[0]
+    expect(args[args.length - 2]).toBe('--')
     expect(args[args.length - 1]).toContain('dx prompts fallback')
   })
 
@@ -286,6 +290,32 @@ describe('dx ai command', () => {
 
     await handleAi(cli, ['x'])
     const [_cmd, args] = spawnMock.mock.calls[0]
+    expect(args[args.length - 2]).toBe('--')
     expect(args[args.length - 1]).toContain('bare filename prompt')
+  })
+
+  it("should allow prompt starting with '---' (frontmatter) without being parsed as flags", async () => {
+    const promptDir = join(tempDir, 'dx', 'prompts')
+    mkdirSync(promptDir, { recursive: true })
+    const promptFile = join(promptDir, 'frontmatter.md')
+    writeFileSync(promptFile, '---\ntitle: test\n---\n\nbody\n', 'utf8')
+
+    const child = new EventEmitter()
+    child.kill = jest.fn()
+    spawnMock.mockImplementation(() => {
+      setTimeout(() => child.emit('exit', 0), 0)
+      return child
+    })
+
+    const cli = makeCli({
+      args: ['ai', 'x'],
+      commands: { ai: { x: { promptFile: 'frontmatter.md' } } },
+    })
+
+    await handleAi(cli, ['x'])
+    const [_cmd, args] = spawnMock.mock.calls[0]
+    expect(args[args.length - 2]).toBe('--')
+    expect(args[args.length - 1]).toContain('---')
+    expect(args[args.length - 1]).toContain('body')
   })
 })
