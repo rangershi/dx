@@ -3,6 +3,7 @@ import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { EventEmitter } from 'node:events'
+import { homedir } from 'node:os'
 
 const spawnMock = jest.fn()
 const spawnSyncMock = jest.fn()
@@ -212,5 +213,33 @@ describe('dx ai command', () => {
     const [_cmd, args] = spawnMock.mock.calls[0]
     expect(args).toEqual(expect.arrayContaining(['--share']))
     expect(args[args.length - 1]).toContain('dev prompt')
+  })
+
+  it('should expand ~ in promptFile', async () => {
+    const home = homedir()
+    const promptDir = join(home, 'dx-ai-test-prompts')
+    mkdirSync(promptDir, { recursive: true })
+
+    const promptFile = join(promptDir, 'prompt.md')
+    writeFileSync(promptFile, 'home prompt', 'utf8')
+
+    const child = new EventEmitter()
+    child.kill = jest.fn()
+    spawnMock.mockImplementation(() => {
+      setTimeout(() => child.emit('exit', 0), 0)
+      return child
+    })
+
+    const cli = makeCli({
+      args: ['ai', 'x'],
+      commands: { ai: { x: { promptFile: `~/dx-ai-test-prompts/prompt.md` } } },
+    })
+
+    await handleAi(cli, ['x'])
+    const [_cmd, args] = spawnMock.mock.calls[0]
+    expect(args[args.length - 1]).toContain('home prompt')
+
+    // best-effort cleanup
+    rmSync(promptDir, { recursive: true, force: true })
   })
 })
