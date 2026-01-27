@@ -242,4 +242,50 @@ describe('dx ai command', () => {
     // best-effort cleanup
     rmSync(promptDir, { recursive: true, force: true })
   })
+
+  it('should fallback to dx/prompts for relative promptFile when not found in project root', async () => {
+    const promptDir = join(tempDir, 'dx', 'prompts')
+    mkdirSync(promptDir, { recursive: true })
+    const promptFile = join(promptDir, 'git-commit-and-pr.md')
+    writeFileSync(promptFile, 'dx prompts fallback', 'utf8')
+
+    const child = new EventEmitter()
+    child.kill = jest.fn()
+    spawnMock.mockImplementation(() => {
+      setTimeout(() => child.emit('exit', 0), 0)
+      return child
+    })
+
+    const cli = makeCli({
+      args: ['ai', 'pr'],
+      commands: { ai: { pr: { promptFile: './prompts/git-commit-and-pr.md' } } },
+    })
+
+    await handleAi(cli, ['pr'])
+    const [_cmd, args] = spawnMock.mock.calls[0]
+    expect(args[args.length - 1]).toContain('dx prompts fallback')
+  })
+
+  it('should prefer dx/prompts for bare filename promptFile', async () => {
+    const promptDir = join(tempDir, 'dx', 'prompts')
+    mkdirSync(promptDir, { recursive: true })
+    const promptFile = join(promptDir, 'prompt.md')
+    writeFileSync(promptFile, 'bare filename prompt', 'utf8')
+
+    const child = new EventEmitter()
+    child.kill = jest.fn()
+    spawnMock.mockImplementation(() => {
+      setTimeout(() => child.emit('exit', 0), 0)
+      return child
+    })
+
+    const cli = makeCli({
+      args: ['ai', 'x'],
+      commands: { ai: { x: { promptFile: 'prompt.md' } } },
+    })
+
+    await handleAi(cli, ['x'])
+    const [_cmd, args] = spawnMock.mock.calls[0]
+    expect(args[args.length - 1]).toContain('bare filename prompt')
+  })
 })
