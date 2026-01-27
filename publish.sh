@@ -142,14 +142,17 @@ if [[ -z "${TOKEN}" ]]; then
     fi
   done
 
-  if is_tty; then
-    read -rs -p "请输入 NPM Token: " TOKEN
-    echo
-  else
-    echo "缺少 token：请使用 --token 传入，或在 .env.local（或 .env.loacl）里设置 NPM_TOKEN / NPM_PUBLISH_TOKEN / TOKEN。" >&2
-    echo >&2
-    print_help
-    exit 2
+  # 如果 dotenv 没读到，再进入交互输入
+  if [[ -z "${TOKEN}" ]]; then
+    if is_tty; then
+      read -rs -p "请输入 NPM Token: " TOKEN
+      echo
+    else
+      echo "缺少 token：请使用 --token 传入，或在 .env.local（或 .env.loacl）里设置 NPM_TOKEN / NPM_PUBLISH_TOKEN / TOKEN。" >&2
+      echo >&2
+      print_help
+      exit 2
+    fi
   fi
 fi
 
