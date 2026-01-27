@@ -12,6 +12,10 @@ to the new unified config:
 
 It also describes how the new rules differ, what will break during migration, and how to fix it.
 
+IMPORTANT:
+- `dx/config/env-policy.jsonc` is required.
+- Legacy fallback to `required-env.jsonc` / `local-env-allowlist.jsonc` / `exempted-keys.jsonc` is no longer supported.
+
 ## What Changes
 
 ### Legacy behavior (3 files)
@@ -47,7 +51,7 @@ Do this in one PR to avoid a half-migrated state.
 1) Create `dx/config/env-policy.jsonc`
 2) Update your `.env.<env>` files to include secret placeholders
 3) Update your `.env.<env>.local` files to contain real secret values
-4) Remove/stop maintaining the legacy config files (optional; dx is backward compatible if policy is missing)
+4) Remove/stop maintaining the legacy config files (recommended)
 
 ## Step-by-step
 
@@ -274,8 +278,4 @@ Fix options:
 
 ## Rollback
 
-dx is backward compatible:
-
-- If you remove `dx/config/env-policy.jsonc`, dx falls back to the legacy files.
-
-This is useful if you need to temporarily revert while fixing migration issues.
+No rollback: dx requires `dx/config/env-policy.jsonc`.

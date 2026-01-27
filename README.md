@@ -122,7 +122,7 @@ DX_CONFIG_DIR=/path/to/your-repo/dx/config dx status
 
 target（端）不写死，由 `env-policy.jsonc.targets` 定义；`commands.json` 里的 `app` 通过 `env-policy.jsonc.appToTarget` 映射到某个 target。
 
-注：若未提供 `env-policy.jsonc`，dx 会继续使用旧的 `required-env.jsonc` / `local-env-allowlist.jsonc` / `exempted-keys.jsonc` 逻辑（兼容模式）。
+注：`env-policy.jsonc` 为必需配置；未提供时 dx 将直接报错。
 
 ## 示例工程
 
