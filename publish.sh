@@ -6,6 +6,50 @@ REGISTRY="${REGISTRY:-$DEFAULT_REGISTRY}"
 TOKEN=""
 OTP="" # 可选：当账号强制要求 OTP 时使用
 
+dotenv_get() {
+  # 从 dotenv 文件里安全读取 key 的值（不 source，避免执行任意代码）
+  # 支持：KEY=value、export KEY=value、允许空格；忽略空行与注释行
+  local file="$1"
+  local key="$2"
+  local line rest value
+
+  [[ -f "$file" ]] || return 1
+
+  while IFS= read -r line || [[ -n "$line" ]]; do
+    # 去掉行首空白
+    line="${line#${line%%[![:space:]]*}}"
+    [[ -z "$line" ]] && continue
+    [[ "$line" == \#* ]] && continue
+    [[ "$line" == export[[:space:]]* ]] && line="${line#export }"
+
+    case "$line" in
+      "${key}="*)
+        rest="${line#${key}=}"
+        # 去掉行尾注释（仅当存在至少一个空格后 #）
+        rest="${rest%%[[:space:]]#*}"
+        # 去掉前后空白
+        rest="${rest#${rest%%[![:space:]]*}}"
+        rest="${rest%${rest##*[![:space:]]}}"
+
+        value="$rest"
+        # 去掉成对引号（简单场景足够）
+        if [[ ${#value} -ge 2 ]]; then
+          if [[ "${value:0:1}" == '"' && "${value: -1}" == '"' ]]; then
+            value="${value:1:${#value}-2}"
+          elif [[ "${value:0:1}" == "'" && "${value: -1}" == "'" ]]; then
+            value="${value:1:${#value}-2}"
+          fi
+        fi
+
+        printf '%s' "$value"
+        return 0
+        ;;
+    esac
+  done <"$file"
+
+  return 1
+}
+
 print_help() {
   cat <<EOF
 用法:
@@ -33,6 +77,9 @@ print_help() {
 
   # 直接传 token
   ./publish.sh --token "npm_xxx"
+
+  # 不传 token 时，自动从 .env.local（或 .env.loacl）读取 NPM_TOKEN / NPM_PUBLISH_TOKEN / TOKEN
+  ./publish.sh
 
   # 若 registry 策略要求 OTP
   ./publish.sh --token "npm_xxx" --otp 123456
@@ -83,11 +130,23 @@ cleanup() {
 trap cleanup EXIT
 
 if [[ -z "${TOKEN}" ]]; then
+  # 优先从本地 dotenv 读取 token（不写入仓库文件）
+  for dotenv_file in ".env.local" ".env.loacl"; do
+    if [[ -f "${dotenv_file}" ]]; then
+      TOKEN="$(dotenv_get "${dotenv_file}" "NPM_TOKEN" || true)"
+      [[ -n "${TOKEN}" ]] && break
+      TOKEN="$(dotenv_get "${dotenv_file}" "NPM_PUBLISH_TOKEN" || true)"
+      [[ -n "${TOKEN}" ]] && break
+      TOKEN="$(dotenv_get "${dotenv_file}" "TOKEN" || true)"
+      [[ -n "${TOKEN}" ]] && break
+    fi
+  done
+
   if is_tty; then
     read -rs -p "请输入 NPM Token: " TOKEN
     echo
   else
-    echo "缺少 token，请使用 --token 传入。" >&2
+    echo "缺少 token：请使用 --token 传入，或在 .env.local（或 .env.loacl）里设置 NPM_TOKEN / NPM_PUBLISH_TOKEN / TOKEN。" >&2
     echo >&2
     print_help
     exit 2
