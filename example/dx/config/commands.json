@@ -115,11 +115,5 @@
       "dangerous": true,
       "description": "清理 Nx 缓存"
     }
-  },
-  "ai": {
-    "review": {
-      "promptFile": "./README.md",
-      "passthrough": ["--share"]
-    }
   }
 }

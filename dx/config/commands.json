@@ -357,12 +357,5 @@
   "install": {
     "command": "pnpm install --frozen-lockfile",
     "description": "安装依赖（使用 frozen-lockfile 确保版本一致）"
-  },
-  "ai": {
-    "pr": {
-      "promptFile": "git-commit-and-pr.md",
-      "model": "opencode/gpt-5-nano",
-      "agent": "general"
-    }
   }
 }
