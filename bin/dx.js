@@ -2,6 +2,7 @@
 
 import { existsSync } from 'node:fs'
 import { resolve, dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 
 function parseConfigDir(argv) {
   const envValue = process.env.DX_CONFIG_DIR
@@ -58,6 +59,19 @@ function isVersionInvocation(argv) {
   return false
 }
 
+function isInitialInvocation(argv) {
+  const raw = Array.isArray(argv) ? argv : []
+  const filtered = stripConfigDirArgs(raw)
+
+  for (const token of filtered) {
+    if (token === '--') break
+    if (token.startsWith('-')) continue
+    return token === 'initial'
+  }
+
+  return false
+}
+
 function findProjectRootFrom(startDir) {
   let current = resolve(startDir)
   while (true) {
@@ -99,6 +113,23 @@ async function main() {
     const { getPackageVersion } = await import('../lib/version.js')
     console.log(getPackageVersion())
     return
+  }
+
+  if (isInitialInvocation(rawArgs)) {
+    const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..')
+    const [{ logger }, { runOpenCodeInitial }] = await Promise.all([
+      import('../lib/logger.js'),
+      import('../lib/opencode-initial.js'),
+    ])
+
+    try {
+      await runOpenCodeInitial({ packageRoot })
+      return
+    } catch (error) {
+      logger.error('initial 执行失败')
+      logger.error(error?.message || String(error))
+      process.exit(1)
+    }
   }
 
   const overrideConfigDir = parseConfigDir(rawArgs)
