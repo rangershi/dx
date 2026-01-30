@@ -49,8 +49,8 @@ echo "opencode-openai-codex-auth:" && (grep -q 'opencode-openai-codex-auth' ~/.c
 echo "=== OMO_CONFIG ===";
 echo "sisyphus_agent:" && (grep -q '"sisyphus_agent"' ~/.config/opencode/oh-my-opencode.json 2>/dev/null && echo "CONFIGURED" || echo "NOT_CONFIGURED");
 echo "agents.sisyphus.variant:" && (node -e "const fs=require('node:fs');const os=require('node:os');const p=os.homedir()+'/.config/opencode/oh-my-opencode.json';try{const j=JSON.parse(fs.readFileSync(p,'utf8'));process.exit(j?.agents?.sisyphus?.variant==='none'?0:1)}catch(e){process.exit(1)}" 2>/dev/null && echo "CONFIGURED" || echo "NOT_CONFIGURED");
-echo "agents.quick:" && (grep -Eq '"agents"[[:space:]]*:' ~/.config/opencode/opencode.json 2>/dev/null && grep -Eq '"quick"[[:space:]]*:' ~/.config/opencode/opencode.json 2>/dev/null && echo "CONFIGURED" || echo "NOT_CONFIGURED");
-echo "agents.middle:" && (grep -Eq '"agents"[[:space:]]*:' ~/.config/opencode/opencode.json 2>/dev/null && grep -Eq '"middle"[[:space:]]*:' ~/.config/opencode/opencode.json 2>/dev/null && echo "CONFIGURED" || echo "NOT_CONFIGURED");
+echo "agent.quick:" && (grep -Eq '"agent"[[:space:]]*:' ~/.config/opencode/opencode.json 2>/dev/null && grep -Eq '"quick"[[:space:]]*:' ~/.config/opencode/opencode.json 2>/dev/null && echo "CONFIGURED" || echo "NOT_CONFIGURED");
+echo "agent.middle:" && (grep -Eq '"agent"[[:space:]]*:' ~/.config/opencode/opencode.json 2>/dev/null && grep -Eq '"middle"[[:space:]]*:' ~/.config/opencode/opencode.json 2>/dev/null && echo "CONFIGURED" || echo "NOT_CONFIGURED");
 ```
 
 ---
@@ -71,8 +71,8 @@ opencode-openai-codex-auth     | <状态>   | -
 agent-browser                  | <状态>   | <版本>
 sisyphus_agent 配置            | <状态>   | -
 agents.sisyphus.variant 配置    | <状态>   | -
-agents.quick 配置              | <状态>   | -
-agents.middle 配置             | <状态>   | -
+agent.quick 配置              | <状态>   | -
+agent.middle 配置             | <状态>   | -
 ```
 
 ---
@@ -211,13 +211,13 @@ grep -q '"sisyphus_agent"' ~/.config/opencode/oh-my-opencode.json && echo "✅ s
 node -e "const fs=require('node:fs');const os=require('node:os');const p=os.homedir()+'/.config/opencode/oh-my-opencode.json';const j=JSON.parse(fs.readFileSync(p,'utf8'));console.log(j?.agents?.sisyphus?.variant||'MISSING');process.exit(j?.agents?.sisyphus?.variant==='none'?0:1)" && echo "✅ agents.sisyphus.variant=none" || echo "❌ agents.sisyphus.variant 不是 none"
 ```
 
-### 3.8 opencode.json agents 配置缺失
+### 3.8 opencode.json agent 配置缺失
 
-如果 `~/.config/opencode/opencode.json` 缺少 `agents.quick` 或 `agents.middle`，使用 Edit 工具添加：
+如果 `~/.config/opencode/opencode.json` 缺少 `agent.quick` 或 `agent.middle`，使用 Edit 工具添加：
 
 ```json
 {
-  "agents": {
+  "agent": {
     "quick": {
       "model": "github-copilot/claude-haiku-4.5"
     },
@@ -231,11 +231,11 @@ node -e "const fs=require('node:fs');const os=require('node:os');const p=os.home
 验证配置：
 
 ```bash
-# 检查 agents.quick
-grep -Eq '"agents"[[:space:]]*:' ~/.config/opencode/opencode.json && grep -Eq '"quick"[[:space:]]*:' ~/.config/opencode/opencode.json && echo "✅ agents.quick 已配置" || echo "❌ agents.quick 缺失"
+# 检查 agent.quick
+grep -Eq '"agent"[[:space:]]*:' ~/.config/opencode/opencode.json && grep -Eq '"quick"[[:space:]]*:' ~/.config/opencode/opencode.json && echo "✅ agent.quick 已配置" || echo "❌ agent.quick 缺失"
 
-# 检查 agents.middle
-grep -Eq '"agents"[[:space:]]*:' ~/.config/opencode/opencode.json && grep -Eq '"middle"[[:space:]]*:' ~/.config/opencode/opencode.json && echo "✅ agents.middle 已配置" || echo "❌ agents.middle 缺失"
+# 检查 agent.middle
+grep -Eq '"agent"[[:space:]]*:' ~/.config/opencode/opencode.json && grep -Eq '"middle"[[:space:]]*:' ~/.config/opencode/opencode.json && echo "✅ agent.middle 已配置" || echo "❌ agent.middle 缺失"
 ```
 
 ---

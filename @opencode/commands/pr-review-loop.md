@@ -1,6 +1,6 @@
 ---
 allowed-tools: [Bash, Read, Glob, TodoWrite, Edit, Grep, Task]
-description: 'Run multi-agent PR review + auto-fix loop with GitHub comments'
+description: '循环审核修复'
 agent: sisyphus
 ---
 

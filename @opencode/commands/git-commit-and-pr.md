@@ -1,7 +1,7 @@
 ---
 allowed-tools: [Bash, Read, Glob, TodoWrite, Edit, Grep]
 description: 'Git 工作流：Issue/Commit/PR 自动化'
-agent: quick
+agent: middle
 ---
 
 ## 用法
@@ -245,7 +245,7 @@ EOF
 
 ```
 💡 提示：运行以下命令启动自动评审
-/dx:pr-review-loop --pr <PR_NUMBER>
+/pr-review-loop --pr <PR_NUMBER>
 ```
 
 ---
@@ -262,7 +262,7 @@ Commit: <hash> <主题>
 PR: #<编号> → <URL>
 
 💡 下一步：运行以下命令启动自动评审
-/dx:pr-review-loop --pr <编号>
+/pr-review-loop --pr <编号>
 ```
 
 **部分完成：**
