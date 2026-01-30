@@ -13,3 +13,5 @@ pnpm-debug.log*
 /.idea/vcs.xml
 /.idea/copilot.data.migration.agent.xml
 /.sisyphus/*
+/.idea/copilot.data.migration.ask.xml
+/.idea/copilot.data.migration.edit.xml
