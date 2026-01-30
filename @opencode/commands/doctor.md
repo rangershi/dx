@@ -32,8 +32,7 @@ echo "agent-browser:" && (which agent-browser && agent-browser --version 2>/dev/
 # 批次 2: 项目文件检测
 echo "=== PROJECT_FILES ===";
 echo "AGENTS.md:" && (test -f AGENTS.md && echo "FOUND" || echo "NOT_FOUND");
-echo "opencode.json:" && (test -f opencode.json && echo "CONFIGURED" || echo "NOT_FOUND");
-echo "instructions:" && (if [ -f opencode.json ]; then grep -q '"AGENTS.md"' opencode.json && grep -q '"ruler/' opencode.json && echo "VALID" || echo "INVALID"; else echo "SKIP"; fi);
+echo "instructions:" && (grep -q '"AGENTS.md"' ~/.config/opencode/opencode.json 2>/dev/null && grep -q '"ruler/' ~/.config/opencode/opencode.json 2>/dev/null && echo "CONFIGURED" || echo "NOT_CONFIGURED");
 ```
 
 ```bash
@@ -60,19 +59,18 @@ echo "agent.middle:" && (grep -Eq '"agent"[[:space:]]*:' ~/.config/opencode/open
 汇总结果，输出表格：
 
 ```
-工具                           | 状态     | 版本
-opencode                       | <状态>   | <版本>
-dx                             | <状态>   | <版本>
-AGENTS.md                      | <状态>   | -
-opencode.json                  | <状态>   | -
-配置指令                       | <状态>   | -
-oh-my-opencode                 | <状态>   | -
-opencode-openai-codex-auth     | <状态>   | -
-agent-browser                  | <状态>   | <版本>
-sisyphus_agent 配置            | <状态>   | -
-agents.sisyphus.variant 配置    | <状态>   | -
-agent.quick 配置              | <状态>   | -
-agent.middle 配置             | <状态>   | -
+工具                                  | 状态     | 版本
+opencode                              | <状态>   | <版本>
+dx                                    | <状态>   | <版本>
+AGENTS.md                             | <状态>   | -
+全局 instructions 配置                 | <状态>   | -
+oh-my-opencode 插件                   | <状态>   | -
+opencode-openai-codex-auth 插件       | <状态>   | -
+agent-browser                         | <状态>   | <版本>
+全局 sisyphus_agent 配置              | <状态>   | -
+全局 agents.sisyphus.variant 配置     | <状态>   | -
+全局 agent.quick 配置                 | <状态>   | -
+全局 agent.middle 配置                | <状态>   | -
 ```
 
 ---
@@ -100,12 +98,19 @@ brew install opencode || npm install -g opencode
 
 - AGENTS.md 文件不存在，OpenCode 需要此文件作为项目指令入口
 - 建议创建或检查文件路径
+- AGENTS.md 应位于项目根目录，并在全局 `~/.config/opencode/opencode.json` 的 `instructions` 中引用
 
-### 3.3 opencode.json 未配置
+### 3.3 全局 opencode.json instructions 配置缺失
 
-使用 Write 工具创建配置文件：
+**注意：instructions 配置应在全局配置文件 `~/.config/opencode/opencode.json` 中，而非项目根目录。项目根目录不需要 opencode.json 文件。**
 
-文件路径：`<项目根目录>/opencode.json`
+1. 先读取现有全局配置：
+
+```bash
+cat ~/.config/opencode/opencode.json
+```
+
+2. 使用 Edit 工具在 `~/.config/opencode/opencode.json` 中添加或修改 `instructions` 配置：
 
 ```json
 {
@@ -114,24 +119,24 @@ brew install opencode || npm install -g opencode
 }
 ```
 
-### 3.4 配置指令无效
+### 3.4 全局配置指令无效
 
-使用 Edit 工具修复 opencode.json，确保包含：
+使用 Edit 工具修复 `~/.config/opencode/opencode.json`，确保包含：
 
 - `"AGENTS.md"`: 主配置文件
 - `"ruler/**/*.md"`: 自动加载 ruler 目录下所有 .md 文件（因 OpenCode 不支持 @ 引用）
 
-### 3.5 OpenCode 插件安装
+### 3.5 全局 OpenCode 插件安装
 
-**OpenCode 插件通过编辑 `~/.config/opencode/opencode.json` 的 `plugin` 数组安装。**
+**注意：OpenCode 插件配置应在全局配置文件 `~/.config/opencode/opencode.json` 中，而非项目根目录。**
 
-1. 先读取现有配置：
+1. 先读取现有全局配置：
 
 ```bash
 cat ~/.config/opencode/opencode.json
 ```
 
-2. 使用 Edit 工具在 `plugin` 数组中添加缺失的插件：
+2. 使用 Edit 工具在 `~/.config/opencode/opencode.json` 的 `plugin` 数组中添加缺失的插件：
    - `oh-my-opencode`
    - `opencode-openai-codex-auth`
 
@@ -158,11 +163,11 @@ grep -E 'oh-my-opencode|opencode-openai-codex-auth' ~/.config/opencode/opencode.
 npm install -g agent-browser && agent-browser install
 ```
 
-### 3.7 oh-my-opencode.json 配置缺失
+### 3.7 全局 oh-my-opencode.json 配置缺失
 
-**检查并修复 `~/.config/opencode/oh-my-opencode.json` 配置。**
+**注意：oh-my-opencode 配置应在全局配置文件 `~/.config/opencode/oh-my-opencode.json` 中，而非项目根目录。**
 
-1. 先读取现有配置：
+1. 先读取现有全局配置：
 
 ```bash
 cat ~/.config/opencode/oh-my-opencode.json
@@ -211,7 +216,9 @@ grep -q '"sisyphus_agent"' ~/.config/opencode/oh-my-opencode.json && echo "✅ s
 node -e "const fs=require('node:fs');const os=require('node:os');const p=os.homedir()+'/.config/opencode/oh-my-opencode.json';const j=JSON.parse(fs.readFileSync(p,'utf8'));console.log(j?.agents?.sisyphus?.variant||'MISSING');process.exit(j?.agents?.sisyphus?.variant==='none'?0:1)" && echo "✅ agents.sisyphus.variant=none" || echo "❌ agents.sisyphus.variant 不是 none"
 ```
 
-### 3.8 opencode.json agent 配置缺失
+### 3.8 全局 opencode.json agent 配置缺失
+
+**注意：agent 配置应在全局配置文件 `~/.config/opencode/opencode.json` 中，而非项目根目录。**
 
 如果 `~/.config/opencode/opencode.json` 缺少 `agent.quick` 或 `agent.middle`，使用 Edit 工具添加：
 
