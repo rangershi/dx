@@ -45,7 +45,8 @@ agent: sisyphus
   - `round: <ROUND>`
   - `contextFile: <path>`
 - reviewer 默认读 `contextFile`；必要时允许用 `git/gh` 只读命令拿 diff
-
+- 忽略问题：1.格式化代码引起的噪音 2.已经lint检查以外的格式问题
+- 特别关注: 逻辑、安全、性能、可维护性
 - 每个 reviewer 输出：`reviewFile: <path>`（Markdown）
 
 3. Task: `pr-review-aggregate`
