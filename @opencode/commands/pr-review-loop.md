@@ -34,18 +34,20 @@ agent: sisyphus
     - 若仍返回 `{"ok":false,"fixFile":"..."}`：第 2 次 Task `pr-fix` → 再 Task `pr-precheck`
   - 若仍不是 `{"ok":true}`：终止并回传错误（建议：`{"error":"PRECHECK_NOT_CLEAN_AFTER_FIX"}`）
 
-1. Task: `pr-context`
+1. Task: `pr-context` **（必须先完成，不可与 Step 2 并行）**
 
 - prompt 必须包含：`PR #{{PR_NUMBER}}`、`round: <ROUND>`
 - 若返回 `{"error":"..."}`：立即终止本轮并回传错误（不再调用 reviewers）
 - 取出：`contextFile`、`runId`、`headOid`（如有）
+- **CRITICAL**: 必须等待此 Task 成功完成并获取到 `contextFile` 后，才能进入 Step 2
 
-2. Task（并行）: `codex-reviewer` + `claude-reviewer` + `gemini-reviewer`
+2. Task（并行）: `codex-reviewer` + `claude-reviewer` + `gemini-reviewer` **（依赖 Step 1 的 contextFile）**
 
+- **DEPENDENCY**: 这三个 reviewers 依赖 Step 1 返回的 `contextFile`，因此**必须等 Step 1 完成后才能并行启动**
 - 每个 reviewer prompt 必须包含：
   - `PR #{{PR_NUMBER}}`
   - `round: <ROUND>`
-  - `contextFile: <path>`
+  - `contextFile: <path>`（来自 Step 1 的输出）
 - reviewer 默认读 `contextFile`；必要时允许用 `git/gh` 只读命令拿 diff
 - 忽略问题：1.格式化代码引起的噪音 2.已经lint检查以外的格式问题
 - 特别关注: 逻辑、安全、性能、可维护性

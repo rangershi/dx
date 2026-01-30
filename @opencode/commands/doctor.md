@@ -1,7 +1,7 @@
 ---
 allowed-tools: [Bash, AskUserQuestion, Edit, Read, Write]
 description: '环境诊断'
-agent: sisyphus
+agent: middle
 ---
 
 ---
