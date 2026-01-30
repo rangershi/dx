@@ -48,8 +48,9 @@ echo "opencode-openai-codex-auth:" && (grep -q 'opencode-openai-codex-auth' ~/.c
 # 批次 4: oh-my-opencode.json 配置检测
 echo "=== OMO_CONFIG ===";
 echo "sisyphus_agent:" && (grep -q '"sisyphus_agent"' ~/.config/opencode/oh-my-opencode.json 2>/dev/null && echo "CONFIGURED" || echo "NOT_CONFIGURED");
-echo "categories.quick:" && (grep -q '"quick"' ~/.config/opencode/oh-my-opencode.json 2>/dev/null && echo "CONFIGURED" || echo "NOT_CONFIGURED");
-echo "categories.middle:" && (grep -q '"middle"' ~/.config/opencode/oh-my-opencode.json 2>/dev/null && echo "CONFIGURED" || echo "NOT_CONFIGURED");
+echo "agents.sisyphus.variant:" && (node -e "const fs=require('node:fs');const os=require('node:os');const p=os.homedir()+'/.config/opencode/oh-my-opencode.json';try{const j=JSON.parse(fs.readFileSync(p,'utf8'));process.exit(j?.agents?.sisyphus?.variant==='none'?0:1)}catch(e){process.exit(1)}" 2>/dev/null && echo "CONFIGURED" || echo "NOT_CONFIGURED");
+echo "agents.quick:" && (grep -Eq '"agents"[[:space:]]*:' ~/.config/opencode/opencode.json 2>/dev/null && grep -Eq '"quick"[[:space:]]*:' ~/.config/opencode/opencode.json 2>/dev/null && echo "CONFIGURED" || echo "NOT_CONFIGURED");
+echo "agents.middle:" && (grep -Eq '"agents"[[:space:]]*:' ~/.config/opencode/opencode.json 2>/dev/null && grep -Eq '"middle"[[:space:]]*:' ~/.config/opencode/opencode.json 2>/dev/null && echo "CONFIGURED" || echo "NOT_CONFIGURED");
 ```
 
 ---
@@ -69,8 +70,9 @@ oh-my-opencode                 | <状态>   | -
 opencode-openai-codex-auth     | <状态>   | -
 agent-browser                  | <状态>   | <版本>
 sisyphus_agent 配置            | <状态>   | -
-categories.quick 配置          | <状态>   | -
-categories.middle 配置         | <状态>   | -
+agents.sisyphus.variant 配置    | <状态>   | -
+agents.quick 配置              | <状态>   | -
+agents.middle 配置             | <状态>   | -
 ```
 
 ---
@@ -185,18 +187,15 @@ cat ~/.config/opencode/oh-my-opencode.json
 
 注意：这是根节点配置，应添加到 JSON 的第一层级。
 
-#### 3.7.2 categories.quick 或 categories.middle 缺失
+#### 3.7.2 agents.sisyphus.variant 不是 none
 
-如果 `categories` 节点缺少 `quick` 或 `middle`，使用 Edit 工具添加：
+如果 `~/.config/opencode/oh-my-opencode.json` 的 `agents.sisyphus.variant` 缺失或不是 `none`，使用 Edit 工具修复为：
 
 ```json
 {
-  "categories": {
-    "quick": {
-      "model": "github-copilot/claude-haiku-4.5"
-    },
-    "middle": {
-      "model": "github-copilot/claude-sonnet-4.5"
+  "agents": {
+    "sisyphus": {
+      "variant": "none"
     }
   }
 }
@@ -208,11 +207,35 @@ cat ~/.config/opencode/oh-my-opencode.json
 # 检查 sisyphus_agent
 grep -q '"sisyphus_agent"' ~/.config/opencode/oh-my-opencode.json && echo "✅ sisyphus_agent 已配置" || echo "❌ sisyphus_agent 缺失"
 
-# 检查 categories.quick
-grep -q '"quick"' ~/.config/opencode/oh-my-opencode.json && echo "✅ quick 已配置" || echo "❌ quick 缺失"
+# 检查 agents.sisyphus.variant
+node -e "const fs=require('node:fs');const os=require('node:os');const p=os.homedir()+'/.config/opencode/oh-my-opencode.json';const j=JSON.parse(fs.readFileSync(p,'utf8'));console.log(j?.agents?.sisyphus?.variant||'MISSING');process.exit(j?.agents?.sisyphus?.variant==='none'?0:1)" && echo "✅ agents.sisyphus.variant=none" || echo "❌ agents.sisyphus.variant 不是 none"
+```
 
-# 检查 categories.middle
-grep -q '"middle"' ~/.config/opencode/oh-my-opencode.json && echo "✅ middle 已配置" || echo "❌ middle 缺失"
+### 3.8 opencode.json agents 配置缺失
+
+如果 `~/.config/opencode/opencode.json` 缺少 `agents.quick` 或 `agents.middle`，使用 Edit 工具添加：
+
+```json
+{
+  "agents": {
+    "quick": {
+      "model": "github-copilot/claude-haiku-4.5"
+    },
+    "middle": {
+      "model": "github-copilot/claude-sonnet-4.5"
+    }
+  }
+}
+```
+
+验证配置：
+
+```bash
+# 检查 agents.quick
+grep -Eq '"agents"[[:space:]]*:' ~/.config/opencode/opencode.json && grep -Eq '"quick"[[:space:]]*:' ~/.config/opencode/opencode.json && echo "✅ agents.quick 已配置" || echo "❌ agents.quick 缺失"
+
+# 检查 agents.middle
+grep -Eq '"agents"[[:space:]]*:' ~/.config/opencode/opencode.json && grep -Eq '"middle"[[:space:]]*:' ~/.config/opencode/opencode.json && echo "✅ agents.middle 已配置" || echo "❌ agents.middle 缺失"
 ```
 
 ---

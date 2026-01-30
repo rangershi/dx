@@ -19,7 +19,6 @@
     "bin/",
     "lib/",
     "@opencode/",
-    "opencode/",
     "LICENSE",
     "README.md",
     "package.json"
