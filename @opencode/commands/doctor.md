@@ -11,17 +11,7 @@ agent: build
 **无论当前是否安装，必须执行：**
 
 ```bash
-pnpm i -g @ranger1/dx
-```
-
----
-
-## Step 0.1: 强制执行 dx initial（同步 OpenCode 模板）
-
-**安装完成后，必须执行一次（可重复执行）：**
-
-```bash
-dx initial
+pnpm add -g @ranger1/dx@latest  && dx initial
 ```
 
 ---
