@@ -16,6 +16,16 @@ pnpm i -g @ranger1/dx
 
 ---
 
+## Step 0.1: 强制执行 dx initial（同步 OpenCode 模板）
+
+**安装完成后，必须执行一次（可重复执行）：**
+
+```bash
+dx initial
+```
+
+---
+
 ## Step 1: 并行检测
 
 **同时执行以下 3 个 Bash 调用（真正并行）：**
@@ -52,6 +62,13 @@ echo "agent.quick:" && (grep -Eq '"agent"[[:space:]]*:' ~/.config/opencode/openc
 echo "agent.middle:" && (grep -Eq '"agent"[[:space:]]*:' ~/.config/opencode/opencode.json 2>/dev/null && grep -Eq '"middle"[[:space:]]*:' ~/.config/opencode/opencode.json 2>/dev/null && echo "CONFIGURED" || echo "NOT_CONFIGURED");
 ```
 
+```bash
+# 批次 5: Python 检测（python3 + python 软链接）
+echo "=== PYTHON ===";
+echo "python3:" && (which python3 && python3 --version 2>/dev/null || echo "NOT_FOUND");
+echo "python:" && (which python && python --version 2>/dev/null || echo "NOT_FOUND");
+```
+
 ---
 
 ## Step 2: 输出报告
@@ -62,6 +79,8 @@ echo "agent.middle:" && (grep -Eq '"agent"[[:space:]]*:' ~/.config/opencode/open
 工具                                  | 状态     | 版本
 opencode                              | <状态>   | <版本>
 dx                                    | <状态>   | <版本>
+python3                               | <状态>   | <版本>
+python(软链接)                         | <状态>   | <版本>
 AGENTS.md                             | <状态>   | -
 全局 instructions 配置                 | <状态>   | -
 oh-my-opencode 插件                   | <状态>   | -
@@ -161,6 +180,47 @@ grep -E 'oh-my-opencode|opencode-openai-codex-auth' ~/.config/opencode/opencode.
 
 ```bash
 npm install -g agent-browser && agent-browser install
+```
+
+### 3.6.1 python3 未安装
+
+执行安装：
+
+```bash
+# macOS (Homebrew)
+brew install python
+```
+
+### 3.6.2 python 命令缺失（需要软链接到 python3）
+
+如果 `python` 不存在但 `python3` 存在，执行：
+
+```bash
+set -e
+
+if command -v python >/dev/null 2>&1; then
+  python --version
+  exit 0
+fi
+
+PY3="$(command -v python3 2>/dev/null || true)"
+if [ -z "$PY3" ]; then
+  echo "python3 NOT_FOUND"
+  exit 1
+fi
+
+PY_DIR="$(dirname "$PY3")"
+if [ -w "$PY_DIR" ]; then
+  ln -sf "$PY3" "$PY_DIR/python"
+  echo "linked: $PY_DIR/python -> $PY3"
+else
+  mkdir -p "$HOME/.local/bin"
+  ln -sf "$PY3" "$HOME/.local/bin/python"
+  echo "linked: $HOME/.local/bin/python -> $PY3"
+  echo "NOTE: ensure $HOME/.local/bin is in PATH"
+fi
+
+python --version
 ```
 
 ### 3.7 全局 oh-my-opencode.json 配置缺失
