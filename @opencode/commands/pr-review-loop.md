@@ -55,6 +55,8 @@ agent: sisyphus
 - reviewer 默认读 `contextFile`；必要时允许用 `git/gh` 只读命令拿 diff
 - 忽略问题：1.格式化代码引起的噪音 2.已经lint检查以外的格式问题
 - 特别关注: 逻辑、安全、性能、可维护性
+- 同时要注意 pr 前面轮次的 修复和讨论，对于已经拒绝、已修复的问题不要反复的提出
+- 同时也要注意fix的过程中有没有引入新的问题。
 - 每个 reviewer 输出：`reviewFile: <path>`（Markdown）
 
 3. Task: `pr-review-aggregate`
