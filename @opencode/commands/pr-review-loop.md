@@ -20,9 +20,8 @@ agent: sisyphus
 - `pr-review-aggregate`
 - `pr-fix`
 
-## 循环（最多 2 轮）
 
-每轮按顺序执行：
+## 预检
 
 0. Task: `pr-precheck`（强制 gate：编译/预检必须先通过）
 
@@ -33,6 +32,11 @@ agent: sisyphus
     - 第 1 次：Task `pr-fix`（使用该 fixFile）→ 再 Task `pr-precheck`
     - 若仍返回 `{"ok":false,"fixFile":"..."}`：第 2 次 Task `pr-fix` → 再 Task `pr-precheck`
   - 若仍不是 `{"ok":true}`：终止并回传错误（建议：`{"error":"PRECHECK_NOT_CLEAN_AFTER_FIX"}`）
+
+
+## 循环（最多 3 轮）
+
+每轮按顺序执行：
 
 1. Task: `pr-context` **（必须先完成，不可与 Step 2 并行）**
 
@@ -76,4 +80,4 @@ agent: sisyphus
 
 6. 下一轮
 
-- 回到 0（先跑 precheck gate，再进入下一轮 reviewers）
+- 回到 1（进入下一轮 reviewers）

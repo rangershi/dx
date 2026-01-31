@@ -46,11 +46,12 @@ reviewFile: ~/.opencode/cache/review-GMN-pr123-r1-abcdef123456.md
 
 1. Read `contextFile` 与全部 `reviewFile`
 2. 计算 needsFix（P0/P1/P2 任意 > 0）
-3. 发布评审评论到 GitHub（gh pr comment），必须带 marker，评论正文必须内联包含：
+3. 合并重复的问题为一个
+4. 发布评审评论到 GitHub（gh pr comment），必须带 marker，评论正文必须内联包含：
    - Summary（P0/P1/P2/P3 统计）
    - P0/P1/P2 问题列表（至少 id/title/file:line/suggestion）
    - 三个 reviewer 的 reviewFile 原文（建议放到 <details>）
-4. 若 needsFix：生成 `fixFile`（Markdown）并返回；否则发布“完成”评论并返回 stop
+5. 若 needsFix：生成 `fixFile`（Markdown）并返回；否则发布“完成”评论并返回 stop
 
 模式 B：
 
