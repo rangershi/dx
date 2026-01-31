@@ -15,7 +15,265 @@ tools:
 
 - `PR #<number>`
 
+## 一键脚本（推荐，省 token）
+
+把「环境/权限校验、PR 信息读取、checkout、base 分支 fetch、cache clear、lint+build、失败时写 fixFile、最终 JSON 输出」压到一次 `bash` 调用里执行。只有当脚本返回 merge 冲突相关错误时，才进入下面第 3 步做内容级合并。
+
+注意：脚本会把所有命令输出写入 `~/.opencode/cache/`，stdout 只打印最终单一 JSON。
+
+```bash
+# 用法：把 PR 号填到 PR_NUMBER
+PR_NUMBER=123 python3 - <<'PY'
+import json
+import os
+import re
+import secrets
+import subprocess
+from pathlib import Path
+
+
+def run(cmd, *, cwd=None, stdout_path=None, stderr_path=None):
+    if stdout_path and stderr_path and stdout_path == stderr_path:
+        f = open(stdout_path, "wb")
+        try:
+            p = subprocess.run(cmd, cwd=cwd, stdout=f, stderr=f)
+            return p.returncode
+        finally:
+            f.close()
+
+    stdout_f = open(stdout_path, "wb") if stdout_path else subprocess.DEVNULL
+    stderr_f = open(stderr_path, "wb") if stderr_path else subprocess.DEVNULL
+    try:
+        p = subprocess.run(cmd, cwd=cwd, stdout=stdout_f, stderr=stderr_f)
+        return p.returncode
+    finally:
+        if stdout_path:
+            stdout_f.close()
+        if stderr_path:
+            stderr_f.close()
+
+
+def run_capture(cmd, *, cwd=None):
+    p = subprocess.run(cmd, cwd=cwd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    return p.returncode, p.stdout, p.stderr
+
+
+def tail_text(path, max_lines=200, max_chars=12000):
+    try:
+        data = Path(path).read_text(errors="replace")
+    except Exception:
+        return "(failed to read log)"
+    lines = data.splitlines()
+    tail = "\n".join(lines[-max_lines:])
+    if len(tail) > max_chars:
+        tail = tail[-max_chars:]
+    return tail
+
+
+def first_file_line(text):
+    # Best-effort: match "path:line:col" or "path:line".
+    for m in re.finditer(r"^([^\s:]+\.[a-zA-Z0-9]+):(\d+)(?::(\d+))?\b", text, flags=re.M):
+        file = m.group(1)
+        line = int(m.group(2))
+        return file, line
+    return None, None
+
+
+def write_fixfile(path, issues):
+    p = Path(path)
+    p.parent.mkdir(parents=True, exist_ok=True)
+    # Minimal schema for pr-fix parser.
+    out = ["## IssuesToFix", ""]
+    for it in issues:
+        out.append(f"- id: {it['id']}")
+        out.append(f"  priority: {it['priority']}")
+        out.append(f"  category: {it['category']}")
+        out.append(f"  file: {it['file']}")
+        out.append(f"  line: {it['line'] if it['line'] is not None else 'null'}")
+        out.append(f"  title: {it['title']}")
+        # Keep as one line; caller should truncate.
+        desc = it["description"].replace("\n", "\\n")
+        sugg = it["suggestion"].replace("\n", "\\n")
+        out.append(f"  description: {desc}")
+        out.append(f"  suggestion: {sugg}")
+    p.write_text("\n".join(out) + "\n")
+
+
+def main():
+    pr = os.environ.get("PR_NUMBER", "").strip()
+    if not pr.isdigit():
+        print(json.dumps({"error": "PR_NUMBER_NOT_PROVIDED"}))
+        return
+
+    # Step 1: must be in git repo.
+    rc, out, _ = run_capture(["git", "rev-parse", "--is-inside-work-tree"])
+    if rc != 0 or out.strip() != "true":
+        print(json.dumps({"error": "NOT_A_GIT_REPO"}))
+        return
+
+    # Step 1: gh auth.
+    rc = run(["gh", "auth", "status"])  # devnull
+    if rc != 0:
+        print(json.dumps({"error": "GH_NOT_AUTHENTICATED"}))
+        return
+
+    # Read PR info.
+    rc, pr_json, _ = run_capture(["gh", "pr", "view", pr, "--json", "headRefName,baseRefName,mergeable"]) 
+    if rc != 0:
+        print(json.dumps({"error": "PR_NOT_FOUND_OR_NO_ACCESS"}))
+        return
+    try:
+        pr_info = json.loads(pr_json)
+    except Exception:
+        print(json.dumps({"error": "PR_NOT_FOUND_OR_NO_ACCESS"}))
+        return
+
+    head = (pr_info.get("headRefName") or "").strip()
+    base = (pr_info.get("baseRefName") or "").strip()
+    mergeable = (pr_info.get("mergeable") or "").strip()
+
+    # Step 2: checkout PR branch if needed.
+    rc, cur_branch, _ = run_capture(["git", "rev-parse", "--abbrev-ref", "HEAD"])
+    if rc != 0:
+        print(json.dumps({"error": "PR_CHECKOUT_FAILED"}))
+        return
+    if head and cur_branch.strip() != head:
+        if run(["gh", "pr", "checkout", pr]) != 0:
+            print(json.dumps({"error": "PR_CHECKOUT_FAILED"}))
+            return
+
+    # Step 3 pre-req: resolve base ref.
+    if not base:
+        rc, out, _ = run_capture(["gh", "repo", "view", "--json", "defaultBranchRef", "--jq", ".defaultBranchRef.name"])
+        if rc == 0:
+            base = out.strip()
+    if not base:
+        print(json.dumps({"error": "PR_BASE_REF_NOT_FOUND"}))
+        return
+
+    # Fetch base.
+    if run(["git", "fetch", "origin", base]) != 0:
+        ok = False
+        for fallback in ("main", "master"):
+            if fallback == base:
+                continue
+            if run(["git", "fetch", "origin", fallback]) == 0:
+                base = fallback
+                ok = True
+                break
+        if not ok:
+            print(json.dumps({"error": "PR_BASE_REF_FETCH_FAILED"}))
+            return
+
+    # If mergeable reports conflict, ask agent to go to conflict-resolution step.
+    if mergeable == "CONFLICTING":
+        print(json.dumps({"error": "PR_MERGE_CONFLICTS_UNRESOLVED"}))
+        return
+
+    # Step 4: cache clear then lint + build (in parallel), logs to cache.
+    run_id = secrets.token_hex(4)
+    cache = Path.home() / ".opencode" / "cache"
+    cache.mkdir(parents=True, exist_ok=True)
+    cache_clear_log = cache / f"precheck-pr{pr}-{run_id}-cache-clear.log"
+    lint_log = cache / f"precheck-pr{pr}-{run_id}-lint.log"
+    build_log = cache / f"precheck-pr{pr}-{run_id}-build.log"
+    meta_log = cache / f"precheck-pr{pr}-{run_id}-meta.json"
+
+    # Keep meta for debugging (not printed to stdout).
+    meta_log.write_text(json.dumps({
+        "pr": int(pr),
+        "headRefName": head,
+        "baseRefName": base,
+        "mergeable": mergeable,
+        "cacheClearLog": str(cache_clear_log),
+        "lintLog": str(lint_log),
+        "buildLog": str(build_log),
+    }, indent=2) + "\n")
+
+    cache_rc = run(["dx", "cache", "clear"], stdout_path=str(cache_clear_log), stderr_path=str(cache_clear_log))
+    if cache_rc != 0:
+        fix_file = f"~/.opencode/cache/precheck-fix-pr{pr}-{run_id}.md"
+        fix_path = str(cache / f"precheck-fix-pr{pr}-{run_id}.md")
+        log_tail = tail_text(cache_clear_log)
+        issues = [{
+            "id": "PRE-001",
+            "priority": "P1",
+            "category": "quality",
+            "file": "<unknown>",
+            "line": None,
+            "title": "dx cache clear failed",
+            "description": log_tail,
+            "suggestion": f"Open log: {cache_clear_log}",
+        }]
+        write_fixfile(fix_path, issues)
+        print(json.dumps({"ok": False, "fixFile": fix_file}))
+        return
+
+    import threading
+
+    results = {}
+
+    def worker(name, cmd, log_path):
+        results[name] = run(cmd, stdout_path=str(log_path), stderr_path=str(log_path))
+
+    t1 = threading.Thread(target=worker, args=("lint", ["dx", "lint"], lint_log))
+    t2 = threading.Thread(target=worker, args=("build", ["dx", "build", "all"], build_log))
+    t1.start(); t2.start(); t1.join(); t2.join()
+
+    if results.get("lint", 1) == 0 and results.get("build", 1) == 0:
+        print(json.dumps({"ok": True}))
+        return
+
+    fix_file = f"~/.opencode/cache/precheck-fix-pr{pr}-{run_id}.md"
+    fix_path = str(cache / f"precheck-fix-pr{pr}-{run_id}.md")
+
+    issues = []
+    i = 1
+    if results.get("lint", 1) != 0:
+        log_tail = tail_text(lint_log)
+        file, line = first_file_line(log_tail)
+        issues.append({
+            "id": f"PRE-{i:03d}",
+            "priority": "P1",
+            "category": "lint",
+            "file": file or "<unknown>",
+            "line": line,
+            "title": "dx lint failed",
+            "description": log_tail,
+            "suggestion": f"Open log: {lint_log}",
+        })
+        i += 1
+    if results.get("build", 1) != 0:
+        log_tail = tail_text(build_log)
+        file, line = first_file_line(log_tail)
+        issues.append({
+            "id": f"PRE-{i:03d}",
+            "priority": "P0",
+            "category": "build",
+            "file": file or "<unknown>",
+            "line": line,
+            "title": "dx build all failed",
+            "description": log_tail,
+            "suggestion": f"Open log: {build_log}",
+        })
+
+    write_fixfile(fix_path, issues)
+    print(json.dumps({"ok": False, "fixFile": fix_file}))
+
+
+if __name__ == "__main__":
+    try:
+        main()
+    except Exception:
+        # Keep stdout contract.
+        print(json.dumps({"error": "PRECHECK_SCRIPT_FAILED"}))
+
+PY
+```
+
 ## 要做的事（按顺序）
+
+优先使用上面的「一键脚本」完成第 1/2/4/5 步；仅当脚本返回 merge 冲突相关错误时，再进入第 3 步进行内容级合并（完成后重跑脚本）。
 
 1. 校验环境/权限
 
@@ -68,8 +326,9 @@ tools:
 
 4. 预检：lint + build
 
+- 运行 `dx cache clear`
 - 运行 `dx lint`
-- 运行 `dx build affected --dev -- --base=origin/<baseRefName> --head=HEAD`
+- 运行 `dx build all`
 
 5. 若 lint/build 失败：生成 fixFile（Markdown）并返回失败
 

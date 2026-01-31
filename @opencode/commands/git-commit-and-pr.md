@@ -113,6 +113,10 @@ gh issue list --search "<关键词>" --limit 5
 
 #### 2.3 执行 Issue 创建
 
+使用命令查看现有标签
+```bash
+gh label list --limit 20
+```
 使用 heredoc 格式执行 gh CLI：
 
 ```bash

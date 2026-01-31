@@ -87,7 +87,6 @@ Round: 2
 要求：只依赖 prompt 中的 `fixFile`；不要重新拉取/生成评审意见。
 
 - 用 bash 读取 `fixFile`（例如 `cat "$fixFile"`）
-- 从 `## IssuesToFix` 中解析条目，按 `priority` 排序并按 `id` 去重
 - 解析失败则返回 `INVALID_FIX_FILE`
 
 ### 2. 逐项修复（No Scope Creep）
@@ -95,10 +94,6 @@ Round: 2
 - 仅修复 fixFile 中列出的问题：`IssuesToFix`（必要）与 `OptionalIssues`（可选）
 - 每个修复必须能明确对应到原问题的 `id`
 - 无法修复时必须记录原因（例如：缺少上下文、超出本 PR 范围、需要产品决策、需要数据库迁移等）
-
-执行前检查（强制）：
-
-- 当前分支禁止是 `main`/`master`（应已由 pr-context 切到 PR 分支）
 
 ### 3. 提交策略
 
@@ -117,6 +112,7 @@ Round: 2
 - 不确定的问题降级为拒绝修复，并写清 `reason`（不要“猜”）
 - 修改尽量小：最小 diff、保持既有风格与约定
 - 修改项目里的json/jsonc文件的时候，使用python脚本进行修改，禁止手动拼接字符串,防止格式错误
+- 修复完成之后，调用 dx lint 和 dx build all 确保编译通过
 
 ## 重要约束（强制）
 
