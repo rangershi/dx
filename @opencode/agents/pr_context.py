@@ -9,8 +9,10 @@ import argparse
 import hashlib
 import json
 import os
+import re
 import subprocess
 import sys
+from urllib.parse import urlparse
 from pathlib import Path
 
 
@@ -24,8 +26,41 @@ def _json_out(obj):
 
 
 def _run_capture(cmd):
-    p = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-    return p.returncode, p.stdout, p.stderr
+    try:
+        p = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        return p.returncode, p.stdout, p.stderr
+    except FileNotFoundError as e:
+        return 127, "", str(e)
+
+
+def _detect_git_remote_host():
+    # Best-effort parse from origin remote.
+    rc, origin_url, _ = _run_capture(["git", "remote", "get-url", "origin"])
+    if rc != 0:
+        rc, origin_url, _ = _run_capture(["git", "config", "--get", "remote.origin.url"])
+    if rc != 0:
+        return None
+
+    url = (origin_url or "").strip()
+    if not url:
+        return None
+
+    # Examples:
+    # - git@github.com:owner/repo.git
+    # - ssh://git@github.company.com/owner/repo.git
+    # - https://github.com/owner/repo.git
+    if url.startswith("git@"):  # SCP-like syntax
+        m = re.match(r"^git@([^:]+):", url)
+        return m.group(1) if m else None
+
+    if url.startswith("ssh://") or url.startswith("https://") or url.startswith("http://"):
+        try:
+            parsed = urlparse(url)
+            return parsed.hostname
+        except Exception:
+            return None
+
+    return None
 
 
 def _clip(s, n):
@@ -95,9 +130,31 @@ def main(argv):
         _json_out({"error": "NOT_A_GIT_REPO"})
         return 1
 
-    if subprocess.run(["gh", "auth", "status"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode != 0:
-        _json_out({"error": "GH_NOT_AUTHENTICATED"})
+    host = _detect_git_remote_host() or "github.com"
+    rc, gh_out, gh_err = _run_capture(["gh", "auth", "status", "--hostname", host])
+    if rc == 127:
+        _json_out({
+            "error": "GH_CLI_NOT_FOUND",
+            "detail": "gh not found in PATH",
+            "suggestion": "Install GitHub CLI: https://cli.github.com/",
+        })
         return 1
+    if rc != 0:
+        # If host detection is wrong, a global check might still succeed.
+        rc2, gh_out2, gh_err2 = _run_capture(["gh", "auth", "status"])
+        if rc2 == 0:
+            pass
+        else:
+            detail = (gh_err or gh_out or "").strip()
+            if len(detail) > 4000:
+                detail = detail[-4000:]
+            _json_out({
+                "error": "GH_NOT_AUTHENTICATED",
+                "host": host,
+                "detail": detail,
+                "suggestion": f"Run: gh auth login --hostname {host}",
+            })
+            return 1
 
     rc, owner_repo, _ = _run_capture(["gh", "repo", "view", "--json", "nameWithOwner", "--jq", ".nameWithOwner"])
     owner_repo = owner_repo.strip() if rc == 0 else ""

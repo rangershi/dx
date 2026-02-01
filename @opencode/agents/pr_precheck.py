@@ -18,10 +18,19 @@ import re
 import secrets
 import subprocess
 import sys
+from urllib.parse import urlparse
 from pathlib import Path
 
 
 def run(cmd, *, cwd=None, stdout_path=None, stderr_path=None):
+    try:
+        return _run(cmd, cwd=cwd, stdout_path=stdout_path, stderr_path=stderr_path)
+    except FileNotFoundError as e:
+        # Match common shell semantics for "command not found".
+        return 127
+
+
+def _run(cmd, *, cwd=None, stdout_path=None, stderr_path=None):
     if stdout_path and stderr_path and stdout_path == stderr_path:
         with open(stdout_path, "wb") as f:
             p = subprocess.run(cmd, cwd=cwd, stdout=f, stderr=f)
@@ -45,8 +54,42 @@ def run(cmd, *, cwd=None, stdout_path=None, stderr_path=None):
 
 
 def run_capture(cmd, *, cwd=None):
-    p = subprocess.run(cmd, cwd=cwd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-    return p.returncode, p.stdout, p.stderr
+    try:
+        p = subprocess.run(cmd, cwd=cwd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        return p.returncode, p.stdout, p.stderr
+    except FileNotFoundError as e:
+        return 127, "", str(e)
+
+
+def _detect_git_remote_host():
+    # Best-effort parse from origin remote.
+    rc, origin_url, _ = run_capture(["git", "remote", "get-url", "origin"])
+    if rc != 0:
+        rc, origin_url, _ = run_capture(["git", "config", "--get", "remote.origin.url"])
+    if rc != 0:
+        return None
+
+    url = (origin_url or "").strip()
+    if not url:
+        return None
+
+    # Examples:
+    # - git@github.com:owner/repo.git
+    # - ssh://git@github.company.com/owner/repo.git
+    # - https://github.com/owner/repo.git
+    if url.startswith("git@"):  # SCP-like syntax
+        # git@host:owner/repo(.git)
+        m = re.match(r"^git@([^:]+):", url)
+        return m.group(1) if m else None
+
+    if url.startswith("ssh://") or url.startswith("https://") or url.startswith("http://"):
+        try:
+            parsed = urlparse(url)
+            return parsed.hostname
+        except Exception:
+            return None
+
+    return None
 
 
 def tail_text(path, max_lines=200, max_chars=12000):
@@ -101,9 +144,25 @@ def main():
         print(json.dumps({"error": "NOT_A_GIT_REPO"}))
         return 1
 
-    rc = run(["gh", "auth", "status"])
+    host = _detect_git_remote_host() or "github.com"
+    rc, gh_out, gh_err = run_capture(["gh", "auth", "status", "--hostname", host])
+    if rc == 127:
+        print(json.dumps({
+            "error": "GH_CLI_NOT_FOUND",
+            "detail": "gh not found in PATH",
+            "suggestion": "Install GitHub CLI: https://cli.github.com/",
+        }))
+        return 1
     if rc != 0:
-        print(json.dumps({"error": "GH_NOT_AUTHENTICATED"}))
+        detail = (gh_err or gh_out or "").strip()
+        if len(detail) > 4000:
+            detail = detail[-4000:]
+        print(json.dumps({
+            "error": "GH_NOT_AUTHENTICATED",
+            "host": host,
+            "detail": detail,
+            "suggestion": f"Run: gh auth login --hostname {host}",
+        }))
         return 1
 
     rc, pr_json, _ = run_capture(["gh", "pr", "view", pr, "--json", "headRefName,baseRefName,mergeable"])

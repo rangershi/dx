@@ -44,3 +44,27 @@ python3 ~/.opencode/agents/pr_context.py --pr <PR_NUMBER> --round <ROUND>
 - **失败/异常时**：
   - 若脚本 stdout 已输出合法 JSON（包含 `error` 或其他字段）→ 仍然**原样返回该 JSON**。
   - 若脚本未输出合法 JSON / 退出异常 → 仅输出一行 JSON：`{"error":"PR_CONTEXT_AGENT_FAILED"}`（必要时可加 `detail` 字段）。
+
+## GitHub 认证校验（重要）
+
+脚本会在调用 `gh repo view/gh pr view` 之前校验 GitHub CLI 已认证。
+
+- 为了避免 `gh auth status` 在“其他 host（例如 enterprise）认证异常”时误判，脚本会优先从 `git remote origin` 推断 host，并使用：
+  - `gh auth status --hostname <host>`
+- 推断失败时默认使用 `github.com`。
+
+可能出现的错误：
+
+- `{"error":"GH_CLI_NOT_FOUND"}`：找不到 `gh` 命令（PATH 内未安装/不可执行）
+  - 处理：安装 GitHub CLI：https://cli.github.com/
+- `{"error":"GH_NOT_AUTHENTICATED"}`：当前 repo 的 host 未认证
+  - 处理：`gh auth login --hostname <host>`
+
+本地排查命令（在同一个 shell 环境运行）：
+
+```bash
+git remote get-url origin
+gh auth status
+gh auth status --hostname github.com
+env | grep '^GH_'
+```
