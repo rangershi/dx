@@ -33,3 +33,14 @@ tools:
 ```bash
 python3 ~/.opencode/agents/pr_context.py --pr <PR_NUMBER> --round <ROUND>
 ```
+
+## 脚本输出处理（强制）
+
+- 脚本 stdout 只会输出**单一一行 JSON**（可 `JSON.parse()`）。
+- **成功时**：你的最终输出必须是**脚本 stdout 的那一行 JSON 原样内容**。
+  - 禁止：解释/分析/补充文字
+  - 禁止：代码块（```）
+  - 禁止：前后空行
+- **失败/异常时**：
+  - 若脚本 stdout 已输出合法 JSON（包含 `error` 或其他字段）→ 仍然**原样返回该 JSON**。
+  - 若脚本未输出合法 JSON / 退出异常 → 仅输出一行 JSON：`{"error":"PR_CONTEXT_AGENT_FAILED"}`（必要时可加 `detail` 字段）。

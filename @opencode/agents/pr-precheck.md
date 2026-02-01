@@ -26,6 +26,18 @@ tools:
 python3 ~/.opencode/agents/pr_precheck.py <PR_NUMBER>
 ```
 
+## 脚本输出处理（强制）
+
+- 脚本 stdout 只会输出**单一一行 JSON**（可 `JSON.parse()`）。
+- **成功时**：你的最终输出必须是**脚本 stdout 的那一行 JSON 原样内容**。
+  - 典型返回：`{"ok":true}` 或 `{"ok":false,"fixFile":"..."}`
+  - 禁止：解释/分析/补充文字
+  - 禁止：代码块（```）
+  - 禁止：前后空行
+- **失败/异常时**：
+  - 若脚本 stdout 已输出合法 JSON（包含 `error` 或其他字段）→ 仍然**原样返回该 JSON**。
+  - 若脚本未输出合法 JSON / 退出异常 → 仅输出一行 JSON：`{"error":"PR_PRECHECK_AGENT_FAILED"}`（必要时可加 `detail` 字段）。
+
 ## 仅当出现 merge 冲突时怎么处理
 
 当脚本输出 `{"error":"PR_MERGE_CONFLICTS_UNRESOLVED"}` 时：

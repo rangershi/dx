@@ -46,11 +46,16 @@ reviewFile: review-GMN-pr123-r1-abcdef123456.md
 
 所有确定性工作（解析/聚合/发评论/生成 fixFile/输出 JSON）都由 `~/.opencode/agents/pr_review_aggregate.py` 完成。
 
-你只做一件事：在模式 A 里用大模型判断哪些 finding 是重复的，并把重复分组作为参数传给脚本（不落盘）。
+你只做两件事：
 
-## 重复分组（给大模型输出）
+1) 在模式 A 里用大模型判断哪些 finding 是重复的，并把重复分组作为参数传给脚本（不落盘）。
+2) 调用脚本后，把脚本 stdout 的 JSON **原样返回**给调用者（不做解释/分析）。
 
-大模型只输出一行 JSON（不要代码块、不要解释文字、不要换行）：
+## 重复分组（仅作为脚本入参）
+
+你需要基于 3 份 `reviewFile` 内容判断重复 finding 分组，生成**一行 JSON**（不要代码块、不要解释文字、不要换行）。
+
+注意：这行 JSON **不是你的最终输出**，它只用于生成 `--duplicate-groups-b64` 传给脚本。
 
 ```json
 {"duplicateGroups":[["CDX-001","CLD-003"],["GMN-002","CLD-005","CDX-004"]]}
@@ -81,3 +86,15 @@ python3 ~/.opencode/agents/pr_review_aggregate.py \
   --run-id <RUN_ID> \
   --fix-report-file <FIX_REPORT_FILE>
 ```
+
+## 脚本输出处理（强制）
+
+- 脚本 stdout 只会输出**单一一行 JSON**（可 `JSON.parse()`）。
+- **成功时**：你的最终输出必须是**脚本 stdout 的那一行 JSON 原样内容**。
+  - 典型返回：`{"stop":true}` 或 `{"stop":false,"fixFile":"..."}` 或 `{"ok":true}`
+  - 禁止：解释/分析/补充文字
+  - 禁止：代码块（```）
+  - 禁止：前后空行
+- **失败/异常时**：
+  - 若脚本 stdout 已输出合法 JSON（包含 `error` 或其他字段）→ 仍然**原样返回该 JSON**。
+  - 若脚本未输出合法 JSON / 退出异常 → 仅输出一行 JSON：`{"error":"PR_REVIEW_AGGREGATE_AGENT_FAILED"}`（必要时可加 `detail` 字段）。
