@@ -2,7 +2,7 @@
 # PR context builder (deterministic).
 # - Reads PR metadata + recent comments via gh
 # - Reads changed files via git diff (no patch)
-# - Writes Markdown context file to ~/.opencode/cache/
+# - Writes Markdown context file to project cache: ./.cache/
 # - Prints exactly one JSON object to stdout
 
 import argparse
@@ -16,7 +16,38 @@ from urllib.parse import urlparse
 from pathlib import Path
 
 
-CACHE_DIR = Path.home() / ".opencode" / "cache"
+def _repo_root():
+    # Prefer git top-level so the cache follows the current repo.
+    try:
+        p = subprocess.run(
+            ["git", "rev-parse", "--show-toplevel"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+            text=True,
+        )
+        out = (p.stdout or "").strip()
+        if p.returncode == 0 and out:
+            return Path(out)
+    except Exception:
+        pass
+    return Path.cwd()
+
+
+def _cache_dir(repo_root):
+    return (repo_root / ".cache").resolve()
+
+
+def _repo_relpath(repo_root, p):
+    try:
+        rel = p.resolve().relative_to(repo_root.resolve())
+        return "./" + rel.as_posix()
+    except Exception:
+        # Fallback to basename-only.
+        return os.path.basename(str(p))
+
+
+REPO_ROOT = _repo_root()
+CACHE_DIR = _cache_dir(REPO_ROOT)
 MARKER_SUBSTR = "<!-- pr-review-loop-marker"
 
 
@@ -252,7 +283,8 @@ def main(argv):
             "repo": {"nameWithOwner": owner_repo},
             "headOid": head_oid,
             "existingMarkerCount": marker_count,
-            "contextFile": context_file,
+            # Handoff should be repo-relative path so downstream agents can read it directly.
+            "contextFile": _repo_relpath(REPO_ROOT, context_path),
         }
     )
     return 0

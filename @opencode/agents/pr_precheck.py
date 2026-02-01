@@ -8,12 +8,14 @@
 # - If mergeable == CONFLICTING: return {"error":"PR_MERGE_CONFLICTS_UNRESOLVED"}
 # - Run dx cache clear
 # - Run dx lint and dx build all concurrently
-# - On failure, write fixFile to ~/.opencode/cache/ and return {"ok":false,"fixFile":"..."}
+# - On failure, write fixFile to project cache: ./.cache/
+#   and return {"ok":false,"fixFile":"./.cache/..."}
 # - On success, return {"ok":true}
 #
 # Stdout contract: print exactly one JSON object and nothing else.
 
 import json
+import os
 import re
 import secrets
 import subprocess
@@ -90,6 +92,34 @@ def _detect_git_remote_host():
             return None
 
     return None
+
+
+def repo_root():
+    try:
+        p = subprocess.run(
+            ["git", "rev-parse", "--show-toplevel"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+            text=True,
+        )
+        out = (p.stdout or "").strip()
+        if p.returncode == 0 and out:
+            return Path(out)
+    except Exception:
+        pass
+    return Path.cwd()
+
+
+def cache_dir(repo_root_path):
+    return (repo_root_path / ".cache").resolve()
+
+
+def repo_relpath(repo_root_path, p):
+    try:
+        rel = p.resolve().relative_to(repo_root_path.resolve())
+        return "./" + rel.as_posix()
+    except Exception:
+        return str(p)
 
 
 def tail_text(path, max_lines=200, max_chars=12000):
@@ -214,7 +244,8 @@ def main():
         return 1
 
     run_id = secrets.token_hex(4)
-    cache = Path.home() / ".opencode" / "cache"
+    root = repo_root()
+    cache = cache_dir(root)
     cache.mkdir(parents=True, exist_ok=True)
     
     cache_clear_log = cache / f"precheck-pr{pr}-{run_id}-cache-clear.log"
@@ -227,9 +258,9 @@ def main():
         "headRefName": head,
         "baseRefName": base,
         "mergeable": mergeable,
-        "cacheClearLog": str(cache_clear_log),
-        "lintLog": str(lint_log),
-        "buildLog": str(build_log),
+        "cacheClearLog": repo_relpath(root, cache_clear_log),
+        "lintLog": repo_relpath(root, lint_log),
+        "buildLog": repo_relpath(root, build_log),
     }, indent=2) + "\n")
 
     cache_rc = run(["dx", "cache", "clear"], stdout_path=str(cache_clear_log), stderr_path=str(cache_clear_log))
@@ -245,10 +276,10 @@ def main():
             "line": None,
             "title": "dx cache clear failed",
             "description": log_tail,
-            "suggestion": f"Open log: {cache_clear_log}",
+            "suggestion": f"Open log: {repo_relpath(root, cache_clear_log)}",
         }]
         write_fixfile(str(fix_path), issues)
-        print(json.dumps({"ok": False, "fixFile": fix_file}))
+        print(json.dumps({"ok": False, "fixFile": repo_relpath(root, fix_path)}))
         return 1
 
     import threading
@@ -285,7 +316,7 @@ def main():
             "line": line,
             "title": "dx lint failed",
             "description": log_tail,
-            "suggestion": f"Open log: {lint_log}",
+            "suggestion": f"Open log: {repo_relpath(root, lint_log)}",
         })
         i += 1
     if results.get("build", 1) != 0:
@@ -299,11 +330,11 @@ def main():
             "line": line,
             "title": "dx build all failed",
             "description": log_tail,
-            "suggestion": f"Open log: {build_log}",
+            "suggestion": f"Open log: {repo_relpath(root, build_log)}",
         })
 
     write_fixfile(str(fix_path), issues)
-    print(json.dumps({"ok": False, "fixFile": fix_file}))
+    print(json.dumps({"ok": False, "fixFile": repo_relpath(root, fix_path)}))
     return 1
 
 

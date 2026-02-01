@@ -12,8 +12,8 @@ agent: sisyphus
 
 ## Cache 约定（强制）
 
-- 本流程所有中间文件都存放在 `~/.opencode/cache/`
-- agent/命令之间仅传递文件名（basename），不传目录
+- 本流程所有中间文件都存放在项目内：`./.cache/`
+- agent/命令之间传递**repo 相对路径**（例如：`./.cache/pr-context-...md`），不要只传 basename
 
 ## 固定 subagent_type（直接用 Task 调用，不要反复确认）
 

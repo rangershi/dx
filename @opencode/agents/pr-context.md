@@ -20,11 +20,11 @@ tools:
 
 ## 输出（强制）
 
-脚本会写入 `~/.opencode/cache/`，stdout 只输出单一 JSON（可 `JSON.parse()`）。
+脚本会写入项目内 `./.cache/`，stdout 只输出单一 JSON（可 `JSON.parse()`）。
 
 ## Cache 约定（强制）
 
-
+- 缓存目录固定为 `./.cache/`；交接一律传 `./.cache/<file>`（repo 相对路径），禁止 basename-only（如 `foo.md`）。
 
 ## 调用脚本（强制）
 

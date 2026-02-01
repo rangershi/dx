@@ -10,8 +10,8 @@ tools:
 # PR Review Aggregator
 
 ## Cache 约定（强制）
-- 本流程所有中间文件都存放在 `~/.opencode/cache/`
-- agent/命令之间仅传递文件名（basename），不传目录
+
+- 缓存目录固定为 `./.cache/`；交接一律传 `./.cache/<file>`（repo 相对路径），禁止 basename-only（如 `foo.md`）。
 
 ## 输入（两种模式）
 

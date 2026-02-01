@@ -26,13 +26,13 @@ tools:
 ## 前置条件
 
 ### Cache 约定（强制）
-- 本流程所有中间文件都存放在 `~/.opencode/cache/`
-- agent/命令之间仅传递文件名（basename），不传目录
+
+- 缓存目录固定为 `./.cache/`；交接一律传 `./.cache/<file>`（repo 相对路径），禁止 basename-only（如 `foo.md`）。
 
 ### 必需输入
 
 - **PR 编号**：调用者必须在 prompt 中明确提供（如：`请修复 PR #123`）
-- **fixFile**：调用者必须在 prompt 中提供问题清单文件名（basename）（Structured Handoff）
+- **fixFile**：调用者必须在 prompt 中提供问题清单文件路径（repo 相对路径，例：`./.cache/fix-...md`）（Structured Handoff）
 
 ### 失败快速退出
 

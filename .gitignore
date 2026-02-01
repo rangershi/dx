@@ -22,6 +22,9 @@ pnpm-debug.log*
 .nx/cache
 .nx/workspace-data
 
+# OpenCode PR review loop cache
+.cache/
+
 # Python
 __pycache__/
 *.py[cod]

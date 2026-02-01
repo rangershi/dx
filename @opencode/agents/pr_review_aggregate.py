@@ -2,12 +2,12 @@
 # Deterministic PR review aggregation (script owns all rules).
 #
 # Workflow:
-# - Mode A: read contextFile + reviewFile(s) from ~/.opencode/cache/, parse findings, merge duplicates,
+# - Mode A: read contextFile + reviewFile(s) from project cache: ./.cache/, parse findings, merge duplicates,
 #   post a single PR comment, and optionally generate a fixFile for pr-fix.
 # - Mode B: read fixReportFile from cache and post it as a PR comment.
 #
 # Input rules:
-# - Callers pass only basenames (no paths). This script reads/writes under ~/.opencode/cache/.
+# - Callers should pass repo-relative paths (e.g. ./.cache/foo.md). For backward-compat, basenames are also accepted.
 # - Duplicate groups come from LLM but are passed as an argument (NOT written to disk).
 #   - Prefer: --duplicate-groups-b64 <base64(json)>
 #   - Also supported: --duplicate-groups-json '<json>'
@@ -20,7 +20,7 @@
 #
 # PR comment rules:
 # - Every comment must include marker: <!-- pr-review-loop-marker -->
-# - Comment body must NOT contain local filesystem paths (this script scrubs ~/.opencode/cache and $HOME).
+# - Comment body must NOT contain local filesystem paths (this script scrubs cache paths, $HOME, and repo absolute paths).
 #
 # fixFile rules:
 # - fixFile includes ONLY P0/P1/P2 findings.
@@ -38,7 +38,76 @@ from pathlib import Path
 
 
 MARKER = "<!-- pr-review-loop-marker -->"
-CACHE_DIR = Path.home() / ".opencode" / "cache"
+
+
+def _repo_root():
+    try:
+        p = subprocess.run(
+            ["git", "rev-parse", "--show-toplevel"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+            text=True,
+        )
+        out = (p.stdout or "").strip()
+        if p.returncode == 0 and out:
+            return Path(out)
+    except Exception:
+        pass
+    return Path.cwd()
+
+
+def _cache_dir(repo_root):
+    return (repo_root / ".cache").resolve()
+
+
+def _is_safe_relpath(p):
+    if p.is_absolute():
+        return False
+    if any(part in ("..",) for part in p.parts):
+        return False
+    return True
+
+
+def _resolve_ref(repo_root, cache_dir, ref):
+    if not ref:
+        return None
+    s = str(ref).strip()
+    if not s:
+        return None
+
+    # If caller already passes a repo-relative path like ./.cache/foo.md
+    looks_like_path = ("/" in s) or ("\\" in s) or s.startswith(".")
+    if looks_like_path:
+        p = Path(s)
+        if p.is_absolute():
+            # Only allow absolute paths under cache_dir.
+            try:
+                p2 = p.resolve()
+                p2.relative_to(cache_dir.resolve())
+                return p2
+            except Exception:
+                return None
+        if not _is_safe_relpath(p):
+            return None
+        return (repo_root / p).resolve()
+
+    # Backward-compat: accept basename-only.
+    b = _safe_basename(s)
+    if not b:
+        return None
+    return (cache_dir / b).resolve()
+
+
+def _repo_relpath(repo_root, p):
+    try:
+        rel = p.resolve().relative_to(repo_root.resolve())
+        return "./" + rel.as_posix()
+    except Exception:
+        return os.path.basename(str(p))
+
+
+REPO_ROOT = _repo_root()
+CACHE_DIR = _cache_dir(REPO_ROOT)
 
 
 def _json_out(obj):
@@ -57,14 +126,19 @@ def _safe_basename(name):
     return base
 
 
-def _read_cache_text(basename):
-    p = CACHE_DIR / basename
+def _read_cache_text(ref):
+    p = _resolve_ref(REPO_ROOT, CACHE_DIR, ref)
+    if not p:
+        raise FileNotFoundError("INVALID_CACHE_REF")
     return p.read_text(encoding="utf-8", errors="replace")
 
 
-def _write_cache_text(basename, content):
+def _write_cache_text(ref, content):
+    p = _resolve_ref(REPO_ROOT, CACHE_DIR, ref)
+    if not p:
+        raise ValueError("INVALID_CACHE_REF")
     CACHE_DIR.mkdir(parents=True, exist_ok=True)
-    p = CACHE_DIR / basename
+    p.parent.mkdir(parents=True, exist_ok=True)
     p.write_text(content, encoding="utf-8", newline="\n")
 
 
@@ -88,12 +162,20 @@ def _sanitize_for_comment(text):
         text = str(text)
 
     home = str(Path.home())
-    cache_abs = str(CACHE_DIR)
+    cache_abs = str(CACHE_DIR.resolve())
+    repo_abs = str(REPO_ROOT.resolve())
 
+    # Backward-compat scrub.
     text = text.replace("~/.opencode/cache/", "[cache]/")
-    text = text.replace(cache_abs + "/", "[cache]/")
     if home:
         text = text.replace(home + "/.opencode/cache/", "[cache]/")
+
+    # New cache scrub.
+    text = text.replace(cache_abs + "/", "[cache]/")
+
+    # Avoid leaking absolute local repo paths.
+    if repo_abs:
+        text = text.replace(repo_abs + "/", "")
 
     return text
 
@@ -236,8 +318,14 @@ def _counts(findings):
     return c
 
 
-def _post_pr_comment(pr_number, body_basename):
-    body_path = str(CACHE_DIR / body_basename)
+def _post_pr_comment(pr_number, body_ref):
+    if isinstance(body_ref, Path):
+        p = body_ref
+    else:
+        p = _resolve_ref(REPO_ROOT, CACHE_DIR, body_ref)
+    if not p:
+        return False
+    body_path = str(p)
     rc = subprocess.run(
         ["gh", "pr", "comment", str(pr_number), "--body-file", body_path],
         stdout=subprocess.DEVNULL,
@@ -334,20 +422,25 @@ def main(argv):
     round_num = args.round
     run_id = str(args.run_id)
 
-    fix_report_file = _safe_basename(args.fix_report_file) if args.fix_report_file else None
-    context_file = _safe_basename(args.context_file) if args.context_file else None
+    fix_report_file = (args.fix_report_file or "").strip() or None
+    context_file = (args.context_file or "").strip() or None
     review_files = []
     for rf in args.review_file or []:
-        b = _safe_basename(rf)
-        if b:
-            review_files.append(b)
+        s = (rf or "").strip()
+        if s:
+            review_files.append(s)
 
     if fix_report_file:
+        fix_p = _resolve_ref(REPO_ROOT, CACHE_DIR, fix_report_file)
+        if not fix_p or not fix_p.exists():
+            _json_out({"error": "FIX_REPORT_FILE_NOT_FOUND"})
+            return 1
         fix_md = _read_cache_text(fix_report_file)
         body = _render_mode_b_comment(pr_number, round_num, run_id, fix_md)
-        body_file = f"review-aggregate-fix-comment-pr{pr_number}-r{round_num}-{run_id}.md"
-        _write_cache_text(body_file, body)
-        if not _post_pr_comment(pr_number, body_file):
+        body_basename = f"review-aggregate-fix-comment-pr{pr_number}-r{round_num}-{run_id}.md"
+        body_ref = _repo_relpath(REPO_ROOT, CACHE_DIR / body_basename)
+        _write_cache_text(body_ref, body)
+        if not _post_pr_comment(pr_number, body_ref):
             _json_out({"error": "GH_PR_COMMENT_FAILED"})
             return 1
         _json_out({"ok": True})
@@ -358,6 +451,21 @@ def main(argv):
         return 1
     if not review_files:
         _json_out({"error": "MISSING_REVIEW_FILES"})
+        return 1
+
+    ctx_p = _resolve_ref(REPO_ROOT, CACHE_DIR, context_file)
+    if not ctx_p or not ctx_p.exists():
+        _json_out({"error": "CONTEXT_FILE_NOT_FOUND"})
+        return 1
+
+    valid_review_files = []
+    for rf in review_files:
+        p = _resolve_ref(REPO_ROOT, CACHE_DIR, rf)
+        if p and p.exists():
+            valid_review_files.append(rf)
+    review_files = valid_review_files
+    if not review_files:
+        _json_out({"error": "REVIEW_FILES_NOT_FOUND"})
         return 1
 
     raw_reviews = []
@@ -377,9 +485,10 @@ def main(argv):
     stop = len(must_fix) == 0
 
     body = _render_mode_a_comment(pr_number, round_num, run_id, counts, must_fix, merged_map, raw_reviews)
-    body_file = f"review-aggregate-comment-pr{pr_number}-r{round_num}-{run_id}.md"
-    _write_cache_text(body_file, body)
-    if not _post_pr_comment(pr_number, body_file):
+    body_basename = f"review-aggregate-comment-pr{pr_number}-r{round_num}-{run_id}.md"
+    body_ref = _repo_relpath(REPO_ROOT, CACHE_DIR / body_basename)
+    _write_cache_text(body_ref, body)
+    if not _post_pr_comment(pr_number, body_ref):
         _json_out({"error": "GH_PR_COMMENT_FAILED"})
         return 1
 
@@ -415,8 +524,9 @@ def main(argv):
         lines.append(f"  description: {desc}")
         lines.append(f"  suggestion: {sugg}")
 
-    _write_cache_text(fix_file, "\n".join(lines) + "\n")
-    _json_out({"stop": False, "fixFile": fix_file})
+    fix_ref = _repo_relpath(REPO_ROOT, CACHE_DIR / fix_file)
+    _write_cache_text(fix_ref, "\n".join(lines) + "\n")
+    _json_out({"stop": False, "fixFile": fix_ref})
     return 0
 
 
