@@ -4,8 +4,6 @@ mode: subagent
 model: openai/gpt-5.1-codex-mini
 temperature: 0.1
 tools:
-  write: true
-  edit: false
   bash: true
 ---
 
@@ -44,80 +42,42 @@ reviewFile: review-CLD-pr123-r1-abcdef123456.md
 reviewFile: review-GMN-pr123-r1-abcdef123456.md
 ```
 
-## 你要做的事（按模式执行）
+## 执行方式（强制）
 
-模式 A：
+所有确定性工作（解析/聚合/发评论/生成 fixFile/输出 JSON）都由 `~/.opencode/agents/pr_review_aggregate.py` 完成。
 
-1. Read `contextFile` 与全部 `reviewFile`
-2. 计算 needsFix（P0/P1/P2 任意 > 0）
-3. 合并重复的问题为一个
-4. 发布评审评论到 GitHub（gh pr comment），必须带 marker，评论正文必须内联包含：
-   - Summary（P0/P1/P2/P3 统计）
-   - P0/P1/P2 问题列表（至少 id/title/file:line/suggestion）
-   - 三个 reviewer 的 reviewFile 原文（建议放到 <details>）
-5. 若 needsFix：生成 `fixFile`（Markdown）并返回；否则发布“完成”评论并返回 stop
+你只做一件事：在模式 A 里用大模型判断哪些 finding 是重复的，并把重复分组作为参数传给脚本（不落盘）。
 
-模式 B：
+## 重复分组（给大模型输出）
 
-1. Read `fixReportFile`
-2. 发布修复评论到 GitHub（gh pr comment），必须带 marker，评论正文必须内联 fixReportFile 内容
-3. 输出 `{"ok":true}`
-
-## 输出（强制）
-
-模式 A：只输出一个 JSON 对象（很小）：
+大模型只输出一行 JSON（不要代码块、不要解释文字、不要换行）：
 
 ```json
-{
-  "stop": false,
-  "fixFile": "fix-pr123-r1-abcdef123456.md"
-}
+{"duplicateGroups":[["CDX-001","CLD-003"],["GMN-002","CLD-005","CDX-004"]]}
 ```
 
-字段：
+## 调用脚本（强制）
 
-- `stop`: boolean
-- `fixFile`: string（仅 stop=false 时必须提供；只返回文件名）
+模式 A（带 reviewFile + 重复分组）：
 
-模式 B：只输出：
-
-```json
-{ "ok": true }
+```bash
+python3 ~/.opencode/agents/pr_review_aggregate.py \
+  --pr <PR_NUMBER> \
+  --round <ROUND> \
+  --run-id <RUN_ID> \
+  --context-file <CONTEXT_FILE> \
+  --review-file <REVIEW_FILE_1> \
+  --review-file <REVIEW_FILE_2> \
+  --review-file <REVIEW_FILE_3> \
+  --duplicate-groups-b64 <BASE64_JSON>
 ```
 
-## 规则
+模式 B（带 fixReportFile）：
 
-- 不要输出 ReviewResult JSON
-- 不要校验/要求 reviewer 的 JSON
-- 不要生成/输出任何时间字段
-- `fixFile` 只包含 P0/P1/P2
-- `id` 必须使用 reviewer 给出的 findingId（例如 `CDX-001`），不要再改前缀
-
-## 评论要求
-
-- 每条评论必须包含：`<!-- pr-review-loop-marker -->`
-- body 必须是最终字符串（用 `--body-file` 读取文件），不要依赖 heredoc 变量展开
-- 禁止在评论里出现本地缓存文件路径
-
-## fixFile 输出路径与格式
-
-- 文件名：`fix-pr<PR_NUMBER>-r<ROUND>-<RUN_ID>.md`
-- 格式：
-
-```md
-# Fix File
-
-PR: <PR_NUMBER>
-Round: <ROUND>
-
-## IssuesToFix
-
-- id: CDX-001
-  priority: P1
-  category: quality
-  file: <path>
-  line: <number|null>
-  title: <short>
-  description: <text>
-  suggestion: <text>
+```bash
+python3 ~/.opencode/agents/pr_review_aggregate.py \
+  --pr <PR_NUMBER> \
+  --round <ROUND> \
+  --run-id <RUN_ID> \
+  --fix-report-file <FIX_REPORT_FILE>
 ```
