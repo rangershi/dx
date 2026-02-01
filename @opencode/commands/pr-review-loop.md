@@ -10,6 +10,11 @@ agent: sisyphus
 
 - `{{PR_NUMBER}}`
 
+## Cache 约定（强制）
+
+- 本流程所有中间文件都存放在 `~/.opencode/cache/`
+- agent/命令之间仅传递文件名（basename），不传目录
+
 ## 固定 subagent_type（直接用 Task 调用，不要反复确认）
 
 - `pr-precheck`
@@ -51,17 +56,17 @@ agent: sisyphus
 - 每个 reviewer prompt 必须包含：
   - `PR #{{PR_NUMBER}}`
   - `round: <ROUND>`
-  - `contextFile: <path>`（来自 Step 1 的输出）
+  - `contextFile: <filename>`（来自 Step 1 的输出）
 - reviewer 默认读 `contextFile`；必要时允许用 `git/gh` 只读命令拿 diff
 - 忽略问题：1.格式化代码引起的噪音 2.已经lint检查以外的格式问题
 - 特别关注: 逻辑、安全、性能、可维护性
 - 同时要注意 pr 前面轮次的 修复和讨论，对于已经拒绝、已修复的问题不要反复的提出
 - 同时也要注意fix的过程中有没有引入新的问题。
-- 每个 reviewer 输出：`reviewFile: <path>`（Markdown）
+- 每个 reviewer 输出：`reviewFile: <filename>`（Markdown）
 
 3. Task: `pr-review-aggregate`
 
-- prompt 必须包含：`PR #{{PR_NUMBER}}`、`round: <ROUND>`、`runId: <RUN_ID>`、`contextFile: <path>`、三条 `reviewFile: <path>`
+- prompt 必须包含：`PR #{{PR_NUMBER}}`、`round: <ROUND>`、`runId: <RUN_ID>`、`contextFile: <filename>`、三条 `reviewFile: <filename>`
 - 输出：`{"stop":true}` 或 `{"stop":false,"fixFile":"..."}`
 - 若 `stop=true`：本轮结束并退出循环
 
@@ -70,14 +75,14 @@ agent: sisyphus
 - prompt 必须包含：
   - `PR #{{PR_NUMBER}}`
   - `round: <ROUND>`
-  - `fixFile: <path>`
+  - `fixFile: <filename>`
 - 约定：`pr-fix` 对每个 findingId 单独 commit + push（一个 findingId 一个 commit），结束后再 `git push` 兜底
 
-- pr-fix 输出：`fixReportFile: <path>`（Markdown）
+- pr-fix 输出：`fixReportFile: <filename>`（Markdown）
 
 5. Task: `pr-review-aggregate`（发布修复评论）
 
-- prompt 必须包含：`PR #{{PR_NUMBER}}`、`round: <ROUND>`、`runId: <RUN_ID>`、`fixReportFile: <path>`
+- prompt 必须包含：`PR #{{PR_NUMBER}}`、`round: <ROUND>`、`runId: <RUN_ID>`、`fixReportFile: <filename>`
 - 输出：`{"ok":true}`
 
 6. 下一轮

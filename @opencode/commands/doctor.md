@@ -204,7 +204,6 @@ if [ -w "$PY_DIR" ]; then
   ln -sf "$PY3" "$PY_DIR/python"
   echo "linked: $PY_DIR/python -> $PY3"
 else
-  mkdir -p "$HOME/.local/bin"
   ln -sf "$PY3" "$HOME/.local/bin/python"
   echo "linked: $HOME/.local/bin/python -> $PY3"
   echo "NOTE: ensure $HOME/.local/bin is in PATH"

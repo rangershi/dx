@@ -19,16 +19,20 @@ tools:
 | -------------- | ------------------------------------------------------------------------ |
 | **角色**       | 代码修复 Specialist（执行层）                                            |
 | **上下文隔离** | 仅处理问题列表；不重新获取评审意见（默认不调用 `gh` 拉取 PR 上下文）     |
-| **输入**       | PR 编号 + `fixFile`（Markdown 文件路径，Structured Handoff）             |
-| **输出**       | fixReportFile（Markdown 文件路径）                                       |
+| **输入**       | PR 编号 + `fixFile`（Markdown 文件名，Structured Handoff）               |
+| **输出**       | fixReportFile（Markdown 文件名）                                         |
 | **边界**       | ✅ 可修改代码、提交并推送；⛔ 不发布 GitHub 评论（由 Orchestrator 负责） |
 
 ## 前置条件
 
+### Cache 约定（强制）
+- 本流程所有中间文件都存放在 `~/.opencode/cache/`
+- agent/命令之间仅传递文件名（basename），不传目录
+
 ### 必需输入
 
 - **PR 编号**：调用者必须在 prompt 中明确提供（如：`请修复 PR #123`）
-- **fixFile**：调用者必须在 prompt 中提供问题清单文件路径（Markdown，Structured Handoff）
+- **fixFile**：调用者必须在 prompt 中提供问题清单文件名（basename）（Structured Handoff）
 
 ### 失败快速退出
 
@@ -122,11 +126,12 @@ Round: 2
 
 ## 输出（强制）
 
-写入：`~/.opencode/cache/fix-report-pr<PR_NUMBER>-r<ROUND>-<RUN_ID>.md`
+写入：`fix-report-pr<PR_NUMBER>-r<ROUND>-<RUN_ID>.md`
 
 最终只输出一行：
 
-`fixReportFile: <path>`
+`fixReportFile: <filename>`
+
 
 ## fixReportFile 内容格式（强制）
 
@@ -167,4 +172,4 @@ Rejected: <n>
 ## 输出有效性保证
 
 - fixReportFile 必须成功写入
-- stdout 只能输出一行 `fixReportFile: <path>`
+- stdout 只能输出一行 `fixReportFile: <filename>`

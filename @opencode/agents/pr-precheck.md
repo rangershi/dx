@@ -11,6 +11,11 @@ tools:
 
 # PR Precheck
 
+## Cache 约定（强制）
+- 本流程所有中间文件都存放在 `~/.opencode/cache/`
+- agent/命令之间仅传递文件名（basename），不传目录
+
+
 ## 输入（prompt 必须包含）
 
 - `PR #<number>`
@@ -19,7 +24,7 @@ tools:
 
 把「环境/权限校验、PR 信息读取、checkout、base 分支 fetch、cache clear、lint+build、失败时写 fixFile、最终 JSON 输出」压到一次 `bash` 调用里执行。只有当脚本返回 merge 冲突相关错误时，才进入下面第 3 步做内容级合并。
 
-注意：脚本会把所有命令输出写入 `~/.opencode/cache/`，stdout 只打印最终单一 JSON。
+注意：脚本会把所有命令输出写入缓存目录，stdout 只打印最终单一 JSON。
 
 ```bash
 # 用法：把 PR 号填到 PR_NUMBER
@@ -81,7 +86,6 @@ def first_file_line(text):
 
 def write_fixfile(path, issues):
     p = Path(path)
-    p.parent.mkdir(parents=True, exist_ok=True)
     # Minimal schema for pr-fix parser.
     out = ["## IssuesToFix", ""]
     for it in issues:
@@ -173,7 +177,6 @@ def main():
     # Step 4: cache clear then lint + build (in parallel), logs to cache.
     run_id = secrets.token_hex(4)
     cache = Path.home() / ".opencode" / "cache"
-    cache.mkdir(parents=True, exist_ok=True)
     cache_clear_log = cache / f"precheck-pr{pr}-{run_id}-cache-clear.log"
     lint_log = cache / f"precheck-pr{pr}-{run_id}-lint.log"
     build_log = cache / f"precheck-pr{pr}-{run_id}-build.log"
@@ -192,7 +195,7 @@ def main():
 
     cache_rc = run(["dx", "cache", "clear"], stdout_path=str(cache_clear_log), stderr_path=str(cache_clear_log))
     if cache_rc != 0:
-        fix_file = f"~/.opencode/cache/precheck-fix-pr{pr}-{run_id}.md"
+        fix_file = f"precheck-fix-pr{pr}-{run_id}.md"
         fix_path = str(cache / f"precheck-fix-pr{pr}-{run_id}.md")
         log_tail = tail_text(cache_clear_log)
         issues = [{
@@ -224,7 +227,7 @@ def main():
         print(json.dumps({"ok": True}))
         return
 
-    fix_file = f"~/.opencode/cache/precheck-fix-pr{pr}-{run_id}.md"
+    fix_file = f"precheck-fix-pr{pr}-{run_id}.md"
     fix_path = str(cache / f"precheck-fix-pr{pr}-{run_id}.md")
 
     issues = []
@@ -332,8 +335,7 @@ PY
 
 5. 若 lint/build 失败：生成 fixFile（Markdown）并返回失败
 
-- 写入前先 `mkdir -p "$HOME/.opencode/cache"`
-- fixFile 路径：`~/.opencode/cache/precheck-fix-pr<PR_NUMBER>-<RUN_ID>.md`
+- fixFile 文件名：`precheck-fix-pr<PR_NUMBER>-<RUN_ID>.md`
 - fixFile 只包含 `## IssuesToFix`
 - fixFile 格式（Markdown，最小字段集，供 `pr-fix` 解析）：
 
@@ -357,7 +359,7 @@ PY
 只输出一个 JSON 对象：
 
 - 通过：`{"ok":true}`
-- 需要修复：`{"ok":false,"fixFile":"~/.opencode/cache/precheck-fix-pr123-<RUN_ID>.md"}`
+- 需要修复：`{"ok":false,"fixFile":"precheck-fix-pr123-<RUN_ID>.md"}`
 - 环境/权限/分支问题：`{"error":"..."}`
 
 ## 规则

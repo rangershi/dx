@@ -32,15 +32,20 @@ tools:
 
 - ✅ 允许使用 `gh` 只读获取 PR 信息与评论
 - ✅ 允许使用 `git` 获取修改文件清单（推荐）
-- ✅ 允许写入缓存文件到 `~/.opencode/cache/`
+- ✅ 允许写入缓存文件
 - ✅ 允许使用本地脚本（python）拼接/裁剪内容
-- ⛔ 禁止修改业务代码（只允许写入 `~/.opencode/cache/`）
+- ⛔ 禁止修改业务代码（只允许写入缓存文件）
 - ⛔ 禁止发布 GitHub 评论（不调用 `gh pr comment/review`）
 - ⛔ 禁止 push/force push/rebase
 
 ## 输出（强制）
 
 你必须输出“单一 JSON 对象”，且能被 `JSON.parse()` 解析。
+
+## Cache 约定（强制）
+- 本流程所有中间文件都存放在 `~/.opencode/cache/`
+- agent/命令之间仅传递文件名（basename），不传目录
+
 
 ```ts
 type PRContextBuildResult = {
@@ -62,7 +67,7 @@ type PRContextBuildResult = {
 3. 获取修改文件清单（优先用 git diff 与 baseRefName 对比；不包含 patch）
 4. 获取评论：最多最近 10 条，正文截断 300 字符
 5. 生成 runId：必须包含 prNumber 与 round；使用 `sha1(prNumber:round:headOid)` 的前 12 位（不使用时间）
-6. 写入 `~/.opencode/cache/pr-context-pr<PR_NUMBER>-r<ROUND>-<RUN_ID>.md`
+6. 写入 `pr-context-pr<PR_NUMBER>-r<ROUND>-<RUN_ID>.md`
 7. 上下文文件内容必须包含：
 
 - PR 基本信息（repo/pr/url/base/head/headOid/labels）
@@ -77,8 +82,6 @@ type PRContextBuildResult = {
 
 ```bash
 set -euo pipefail
-
-mkdir -p "$HOME/.opencode/cache"
 
 OWNER_REPO=$(gh repo view --json nameWithOwner -q .nameWithOwner)
 
@@ -114,8 +117,8 @@ def clip(s, n):
 labels = [l.get('name') for l in (pr.get('labels') or []) if isinstance(l, dict) and l.get('name')]
 
 dir_path = os.path.join(os.path.expanduser('~'), '.opencode', 'cache')
-os.makedirs(dir_path, exist_ok=True)
 context_file = os.path.join(dir_path, f"pr-context-pr{pr_number}-r{round_num}-{run_id}.md")
+context_file_name = os.path.basename(context_file)
 
 base_ref = pr.get('baseRefName') or ''
 head_ref = pr.get('headRefName') or ''
@@ -187,7 +190,7 @@ result = {
   'repo': {'nameWithOwner': owner_repo},
   'headOid': head_oid,
   'existingMarkerCount': marker_count,
-  'contextFile': context_file,
+  'contextFile': context_file_name,
 }
 
 print(json.dumps(result, ensure_ascii=True))
