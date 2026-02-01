@@ -21,3 +21,10 @@ pnpm-debug.log*
 
 .nx/cache
 .nx/workspace-data
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyc
+*.pyo
+*.pyd
