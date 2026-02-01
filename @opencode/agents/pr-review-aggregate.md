@@ -20,15 +20,15 @@ tools:
 - `PR #<number>`
 - `round: <number>`
 - `runId: <string>`
-- `contextFile: <filename>`
-- `reviewFile: <filename>`（三行，分别对应 CDX/CLD/GMN）
+- `contextFile: <path>`（例如：`./.cache/pr-context-...md`）
+- `reviewFile: <path>`（三行，分别对应 CDX/CLD/GMN，例如：`./.cache/review-...md`）
 
 ### 模式 B：发布修复评论（基于 fixReportFile）
 
 - `PR #<number>`
 - `round: <number>`
 - `runId: <string>`
-- `fixReportFile: <filename>`
+- `fixReportFile: <path>`（例如：`./.cache/fix-report-...md`）
 
 示例：
 
@@ -36,10 +36,10 @@ tools:
 PR #123
 round: 1
 runId: abcdef123456
-contextFile: pr-context-pr123-r1-abcdef123456.md
-reviewFile: review-CDX-pr123-r1-abcdef123456.md
-reviewFile: review-CLD-pr123-r1-abcdef123456.md
-reviewFile: review-GMN-pr123-r1-abcdef123456.md
+  contextFile: ./.cache/pr-context-pr123-r1-abcdef123456.md
+  reviewFile: ./.cache/review-CDX-pr123-r1-abcdef123456.md
+  reviewFile: ./.cache/review-CLD-pr123-r1-abcdef123456.md
+  reviewFile: ./.cache/review-GMN-pr123-r1-abcdef123456.md
 ```
 
 ## 执行方式（强制）

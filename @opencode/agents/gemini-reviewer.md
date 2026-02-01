@@ -14,20 +14,21 @@ tools:
 
 - `PR #<number>`
 - `round: <number>`
+- `runId: <string>`（必须透传，禁止自行生成）
 - `contextFile: <filename>`
 
 ## 输出（强制）
 
 只输出一行：
 
-`reviewFile: <filename>`
+`reviewFile: ./.cache/<file>.md`
 
 
 ## 规则
 
 - 默认已在 PR head 分支（可直接读工作区代码）
 - 可用 `git`/`gh` 只读命令获取 diff/上下文
-- 写入 reviewFile：`review-GMN-pr<PR_NUMBER>-r<ROUND>-<RUN_ID>.md`
+- 写入 reviewFile：`./.cache/review-GMN-pr<PR_NUMBER>-r<ROUND>-<RUN_ID>.md`
 - findings id 必须以 `GMN-` 开头
 
 ## Cache 约定（强制）
