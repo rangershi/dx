@@ -22,6 +22,7 @@ agent: sisyphus
 - `codex-reviewer`
 - `claude-reviewer`
 - `gemini-reviewer`
+- `gh-thread-reviewer`
 - `pr-review-aggregate`
 - `pr-fix`
 
@@ -57,9 +58,9 @@ agent: sisyphus
 - 取出：`contextFile`、`runId`、`headOid`（如有）
 - **CRITICAL**: 必须等待此 Task 成功完成并获取到 `contextFile` 后，才能进入 Step 2
 
-2. Task（并行）: `codex-reviewer` + `claude-reviewer` + `gemini-reviewer` **（依赖 Step 1 的 contextFile）**
+2. Task（并行）: `codex-reviewer` + `claude-reviewer` + `gemini-reviewer` + `gh-thread-reviewer` **（依赖 Step 1 的 contextFile）**
 
-- **DEPENDENCY**: 这三个 reviewers 依赖 Step 1 返回的 `contextFile`，因此**必须等 Step 1 完成后才能并行启动**
+- **DEPENDENCY**: 这些 reviewers 依赖 Step 1 返回的 `contextFile`，因此**必须等 Step 1 完成后才能并行启动**
 - 每个 reviewer prompt 必须包含：
   - `PR #{{PR_NUMBER}}`
   - `round: <ROUND>`
@@ -74,7 +75,7 @@ agent: sisyphus
 
 3. Task: `pr-review-aggregate`
 
-- prompt 必须包含：`PR #{{PR_NUMBER}}`、`round: <ROUND>`、`runId: <RUN_ID>`、`contextFile: ./.cache/<file>.md`、三条 `reviewFile: ./.cache/<file>.md`
+- prompt 必须包含：`PR #{{PR_NUMBER}}`、`round: <ROUND>`、`runId: <RUN_ID>`、`contextFile: ./.cache/<file>.md`、以及 1+ 条 `reviewFile: ./.cache/<file>.md`
 - 输出：`{"stop":true}` 或 `{"stop":false,"fixFile":"..."}`
 - 若 `stop=true`：本轮结束并退出循环
 - **唯一性约束**: 每轮只能发布一次 Review Summary；脚本内置幂等检查，重复调用不会重复发布

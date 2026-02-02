@@ -21,7 +21,7 @@ tools:
 - `round: <number>`
 - `runId: <string>`
 - `contextFile: <path>`（例如：`./.cache/pr-context-...md`）
-- `reviewFile: <path>`（三行，分别对应 CDX/CLD/GMN，例如：`./.cache/review-...md`）
+- `reviewFile: <path>`（多行，1+ 条；例如：`./.cache/review-...md`）
 
 ### 模式 B：发布修复评论（基于 fixReportFile）
 
@@ -53,7 +53,7 @@ runId: abcdef123456
 
 ## 重复分组（仅作为脚本入参）
 
-你需要基于 3 份 `reviewFile` 内容判断重复 finding 分组，生成**一行 JSON**（不要代码块、不要解释文字、不要换行）。
+你需要基于所有 `reviewFile` 内容判断重复 finding 分组，生成**一行 JSON**（不要代码块、不要解释文字、不要换行）。
 
 注意：这行 JSON **不是你的最终输出**，它只用于生成 `--duplicate-groups-b64` 传给脚本。
 
