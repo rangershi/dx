@@ -16,3 +16,18 @@ pnpm-debug.log*
 /.idea/copilot.data.migration.ask.xml
 /.idea/copilot.data.migration.edit.xml
 /.idea/copilot.data.migration.ask2agent.xml
+
+
+
+.nx/cache
+.nx/workspace-data
+
+# OpenCode PR review loop cache
+.cache/
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyc
+*.pyo
+*.pyd

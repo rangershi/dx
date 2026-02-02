@@ -26,13 +26,14 @@ tools:
 ## 前置条件
 
 ### Cache 约定（强制）
-- 本流程所有中间文件都存放在 `~/.opencode/cache/`
-- agent/命令之间仅传递文件名（basename），不传目录
+
+- 缓存目录固定为 `./.cache/`；交接一律传 `./.cache/<file>`（repo 相对路径），禁止 basename-only（如 `foo.md`）。
 
 ### 必需输入
 
 - **PR 编号**：调用者必须在 prompt 中明确提供（如：`请修复 PR #123`）
-- **fixFile**：调用者必须在 prompt 中提供问题清单文件名（basename）（Structured Handoff）
+- **runId**：调用者必须在 prompt 中提供（必须透传，禁止自行生成）
+- **fixFile**：调用者必须在 prompt 中提供问题清单文件路径（repo 相对路径，例：`./.cache/fix-...md`）（Structured Handoff）
 
 ### 失败快速退出
 
@@ -126,11 +127,11 @@ Round: 2
 
 ## 输出（强制）
 
-写入：`fix-report-pr<PR_NUMBER>-r<ROUND>-<RUN_ID>.md`
+写入：`./.cache/fix-report-pr<PR_NUMBER>-r<ROUND>-<RUN_ID>.md`
 
 最终只输出一行：
 
-`fixReportFile: <filename>`
+`fixReportFile: ./.cache/<file>.md`
 
 
 ## fixReportFile 内容格式（强制）
@@ -172,4 +173,4 @@ Rejected: <n>
 ## 输出有效性保证
 
 - fixReportFile 必须成功写入
-- stdout 只能输出一行 `fixReportFile: <filename>`
+- stdout 只能输出一行 `fixReportFile: ./.cache/<file>.md`
