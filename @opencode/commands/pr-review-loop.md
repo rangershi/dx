@@ -41,6 +41,13 @@ agent: sisyphus
 
 ## 循环（最多 3 轮）
 
+**⚠️ 严格串行执行要求（Critical）**:
+
+- 每个 Step 必须完成（收到返回值）后才能开始下一个 Step
+- **禁止任何步骤并行执行**（除了 Step 2 的三个 reviewer 可并行）
+- 如果任何步骤失败或超时，必须立即终止当前轮次，不能跳过或重试
+- 每个步骤的 Task 调用必须 await 返回结果，不能 fire-and-forget
+
 每轮按顺序执行：
 
 1. Task: `pr-context` **（必须先完成，不可与 Step 2 并行）**
@@ -70,6 +77,7 @@ agent: sisyphus
 - prompt 必须包含：`PR #{{PR_NUMBER}}`、`round: <ROUND>`、`runId: <RUN_ID>`、`contextFile: ./.cache/<file>.md`、三条 `reviewFile: ./.cache/<file>.md`
 - 输出：`{"stop":true}` 或 `{"stop":false,"fixFile":"..."}`
 - 若 `stop=true`：本轮结束并退出循环
+- **唯一性约束**: 每轮只能发布一次 Review Summary；脚本内置幂等检查，重复调用不会重复发布
 
 4. Task: `pr-fix`
 
@@ -86,7 +94,49 @@ agent: sisyphus
 
 - prompt 必须包含：`PR #{{PR_NUMBER}}`、`round: <ROUND>`、`runId: <RUN_ID>`、`fixReportFile: ./.cache/<file>.md`
 - 输出：`{"ok":true}`
+- **唯一性约束**: 每轮只能发布一次 Fix Report；脚本内置幂等检查，重复调用不会重复发布
 
 6. 下一轮
 
 - 回到 1（进入下一轮 reviewers）
+
+
+## 终止与收尾（强制）
+
+循环结束时，必须发布一个最终评论到 PR，格式如下：
+
+### 情况 A: 所有问题已解决（stop=true）
+
+当 Step 3 返回 `{"stop":true}` 时，调用 `pr-review-aggregate` 发布收尾评论：
+
+- prompt 必须包含：
+  - `PR #{{PR_NUMBER}}`
+  - `round: <ROUND>`
+  - `runId: <RUN_ID>`
+  - `--final-report "RESOLVED"`（新增参数，表示所有问题已解决）
+
+### 情况 B: 达到最大轮次（3 轮后仍有问题）
+
+当循环完成 3 轮后仍未 stop，调用 `pr-review-aggregate` 发布收尾评论：
+
+- prompt 必须包含：
+  - `PR #{{PR_NUMBER}}`
+  - `round: 3`
+  - `runId: <RUN_ID>`
+  - `--final-report "MAX_ROUNDS_REACHED"`（新增参数，表示达到最大轮次）
+
+### 最终评论格式（由脚本生成）
+
+```markdown
+<!-- pr-review-loop-marker -->
+
+## Final Report
+
+- PR: #<PR_NUMBER>
+- Total Rounds: <N>
+- Status: ✅ All issues resolved / ⚠️ Max rounds reached (some issues may remain)
+
+### Summary
+
+[自动生成的总结]
+```

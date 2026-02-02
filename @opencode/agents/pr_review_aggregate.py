@@ -318,13 +318,66 @@ def _counts(findings):
     return c
 
 
-def _post_pr_comment(pr_number, body_ref):
+def _check_existing_comment(pr_number, run_id, round_num, comment_type):
+    """
+    Check if a comment with same runId/round/type already exists.
+    Returns True if duplicate exists (should skip posting).
+    
+    comment_type: "review-summary" or "fix-report" or "final-report"
+    """
+    try:
+        result = subprocess.run(
+            ["gh", "api", f"repos/:owner/:repo/issues/{pr_number}/comments", "--paginate"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+            text=True,
+        )
+        if result.returncode != 0:
+            return False
+        
+        comments = json.loads(result.stdout or "[]")
+        
+        if comment_type == "review-summary":
+            type_header = f"## Review Summary (Round {round_num})"
+        elif comment_type == "fix-report":
+            type_header = f"## Fix Report (Round {round_num})"
+        elif comment_type == "final-report":
+            type_header = "## Final Report"
+        else:
+            return False
+        
+        run_id_pattern = f"RunId: {run_id}"
+        
+        for comment in comments:
+            body = comment.get("body", "")
+            if MARKER in body and type_header in body and run_id_pattern in body:
+                return True
+        
+        return False
+    except Exception:
+        return False
+
+
+def _post_pr_comment(pr_number, body_ref, run_id=None, round_num=None, comment_type=None):
+    """
+    Post a PR comment with idempotency check.
+    
+    If run_id, round_num, and comment_type are provided, checks for existing
+    duplicate before posting and skips if already posted.
+    
+    Returns: True if posted successfully or skipped (idempotent), False on error
+    """
     if isinstance(body_ref, Path):
         p = body_ref
     else:
         p = _resolve_ref(REPO_ROOT, CACHE_DIR, body_ref)
     if not p:
         return False
+    
+    if run_id and round_num and comment_type:
+        if _check_existing_comment(pr_number, run_id, round_num, comment_type):
+            return True
+    
     body_path = str(p)
     rc = subprocess.run(
         ["gh", "pr", "comment", str(pr_number), "--body-file", body_path],
@@ -397,6 +450,32 @@ def _render_mode_b_comment(pr_number, round_num, run_id, fix_report_md):
     return "\n".join(body)
 
 
+def _render_final_comment(pr_number, round_num, run_id, status):
+    lines = []
+    lines.append(MARKER)
+    lines.append("")
+    lines.append("## Final Report")
+    lines.append("")
+    lines.append(f"- PR: #{pr_number}")
+    lines.append(f"- Total Rounds: {round_num}")
+    lines.append(f"- RunId: {run_id}")
+    lines.append("")
+    
+    if status == "RESOLVED":
+        lines.append("### Status: ✅ All issues resolved")
+        lines.append("")
+        lines.append("All P0/P1/P2 issues from the automated review have been addressed.")
+        lines.append("The PR is ready for human review and merge.")
+    else:
+        lines.append("### Status: ⚠️ Max rounds reached")
+        lines.append("")
+        lines.append("The automated review loop has completed the maximum number of rounds (3).")
+        lines.append("Some issues may still remain. Please review the PR comments above for details.")
+    
+    lines.append("")
+    return "\n".join(lines)
+
+
 def main(argv):
     class _ArgParser(argparse.ArgumentParser):
         def error(self, message):
@@ -409,6 +488,7 @@ def main(argv):
     parser.add_argument("--context-file")
     parser.add_argument("--review-file", action="append", default=[])
     parser.add_argument("--fix-report-file")
+    parser.add_argument("--final-report")
     parser.add_argument("--duplicate-groups-json")
     parser.add_argument("--duplicate-groups-b64")
 
@@ -422,6 +502,7 @@ def main(argv):
     round_num = args.round
     run_id = str(args.run_id)
 
+    final_report = (args.final_report or "").strip() or None
     fix_report_file = (args.fix_report_file or "").strip() or None
     context_file = (args.context_file or "").strip() or None
     review_files = []
@@ -429,6 +510,17 @@ def main(argv):
         s = (rf or "").strip()
         if s:
             review_files.append(s)
+
+    if final_report:
+        body = _render_final_comment(pr_number, round_num, run_id, final_report)
+        body_basename = f"review-aggregate-final-pr{pr_number}-{run_id}.md"
+        body_ref = _repo_relpath(REPO_ROOT, CACHE_DIR / body_basename)
+        _write_cache_text(body_ref, body)
+        if not _post_pr_comment(pr_number, body_ref, run_id=run_id, round_num=round_num, comment_type="final-report"):
+            _json_out({"error": "GH_PR_COMMENT_FAILED"})
+            return 1
+        _json_out({"ok": True, "final": True})
+        return 0
 
     if fix_report_file:
         fix_p = _resolve_ref(REPO_ROOT, CACHE_DIR, fix_report_file)
@@ -440,7 +532,7 @@ def main(argv):
         body_basename = f"review-aggregate-fix-comment-pr{pr_number}-r{round_num}-{run_id}.md"
         body_ref = _repo_relpath(REPO_ROOT, CACHE_DIR / body_basename)
         _write_cache_text(body_ref, body)
-        if not _post_pr_comment(pr_number, body_ref):
+        if not _post_pr_comment(pr_number, body_ref, run_id=run_id, round_num=round_num, comment_type="fix-report"):
             _json_out({"error": "GH_PR_COMMENT_FAILED"})
             return 1
         _json_out({"ok": True})
@@ -488,7 +580,7 @@ def main(argv):
     body_basename = f"review-aggregate-comment-pr{pr_number}-r{round_num}-{run_id}.md"
     body_ref = _repo_relpath(REPO_ROOT, CACHE_DIR / body_basename)
     _write_cache_text(body_ref, body)
-    if not _post_pr_comment(pr_number, body_ref):
+    if not _post_pr_comment(pr_number, body_ref, run_id=run_id, round_num=round_num, comment_type="review-summary"):
         _json_out({"error": "GH_PR_COMMENT_FAILED"})
         return 1
 
