@@ -82,10 +82,7 @@ python3 ~/.opencode/agents/gh_review_harvest.py \
 
 - 读取 `rawFile`（JSON）后，提取“建议/问题”并生成 findings：
   - 覆盖 humans + bots（不做作者白名单）。
-  - 去噪：丢弃任何 body 中包含 `<!-- pr-review-loop-marker` 的内容。
   - 忽略纯审批/无内容：如 `LGTM`、`Looks good`、`Approved` 等。
-  - 默认策略：
-    - `isResolved=true` 或 `isOutdated=true` 的 thread 在 harvest 阶段直接丢弃（不进入 rawFile，不消耗 LLM token）。
   - 分类规则（大致）：
     - P0: 明确安全漏洞/数据泄漏/资金损失/远程执行
     - P1: 逻辑 bug/权限绕过/会导致线上错误

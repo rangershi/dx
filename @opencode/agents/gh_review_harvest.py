@@ -16,6 +16,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 
+MARKER_SUBSTR = "<!-- pr-review-loop-marker"
+
 def _repo_root():
     try:
         p = subprocess.run(
@@ -59,6 +61,15 @@ def _run_capture(cmd):
         return p.returncode, p.stdout, p.stderr
     except FileNotFoundError as e:
         return 127, "", str(e)
+
+
+def _has_loop_marker(text):
+    if not text:
+        return False
+    try:
+        return MARKER_SUBSTR in str(text)
+    except Exception:
+        return False
 
 
 def _require_gh_auth():
@@ -126,6 +137,10 @@ def _flatten_threads(gql_data):
         comments_nodes = comments_conn.get("nodes") or []
         comments = []
         for c in comments_nodes:
+            body = (c or {}).get("body") or ""
+            body_text = (c or {}).get("bodyText") or ""
+            if _has_loop_marker(body) or _has_loop_marker(body_text):
+                continue
             author = (c or {}).get("author") or {}
             comments.append(
                 {
@@ -136,12 +151,15 @@ def _flatten_threads(gql_data):
                         "login": author.get("login"),
                         "type": author.get("__typename"),
                     },
-                    "body": (c or {}).get("body") or "",
-                    "bodyText": (c or {}).get("bodyText") or "",
+                    "body": body,
+                    "bodyText": body_text,
                     "createdAt": (c or {}).get("createdAt"),
                     "updatedAt": (c or {}).get("updatedAt"),
                 }
             )
+
+        if not comments:
+            continue
         threads.append(
             {
                 "id": (t or {}).get("id"),
@@ -243,6 +261,11 @@ def main(argv):
 
         reviews = _gh_api_json([f"repos/{owner_repo}/pulls/{pr_number}/reviews", "--paginate"])
         issue_comments = _gh_api_json([f"repos/{owner_repo}/issues/{pr_number}/comments", "--paginate"])
+
+        if isinstance(reviews, list):
+            reviews = [r for r in reviews if not _has_loop_marker((r or {}).get("body") or "")]
+        if isinstance(issue_comments, list):
+            issue_comments = [c for c in issue_comments if not _has_loop_marker((c or {}).get("body") or "")]
 
         now = datetime.now(timezone.utc).isoformat()
         payload = {
