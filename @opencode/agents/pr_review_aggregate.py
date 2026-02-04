@@ -220,6 +220,202 @@ def _parse_duplicate_groups_b64(s):
         return []
 
 
+def _parse_escalation_groups_json(s):
+    """Parse escalation groups JSON (same format as duplicate groups)."""
+    if not s:
+        return []
+    try:
+        data = json.loads(s)
+    except Exception:
+        return []
+
+    groups = []
+    if isinstance(data, dict) and isinstance(data.get("escalationGroups"), list):
+        groups = data.get("escalationGroups")
+    elif isinstance(data, list):
+        groups = data
+    else:
+        return []
+
+    out = []
+    for g in (groups or []):
+        if not isinstance(g, list):
+            continue
+        ids = []
+        for it in g:
+            if isinstance(it, str) and it.strip():
+                ids.append(it.strip())
+        ids = list(dict.fromkeys(ids))
+        if len(ids) >= 2:
+            out.append(ids)
+    return out
+
+
+def _parse_escalation_groups_b64(s):
+    """Decode base64 escalation groups JSON."""
+    if not s:
+        return []
+    try:
+        raw = base64.b64decode(s.encode("ascii"), validate=True)
+        return _parse_escalation_groups_json(raw.decode("utf-8", errors="replace"))
+    except Exception:
+        return []
+
+
+def _parse_decision_log(md_text):
+    """
+    Parse decision log markdown and extract fixed/rejected decisions.
+    
+    Format:
+      # Decision Log
+      PR: 123
+      ## Round 1
+      ### Fixed
+      - id: CDX-001
+        commit: abc123
+        essence: JSON.parse error handling
+      ### Rejected
+      - id: GMN-004
+        priority: P2
+        reason: needs product decision
+        essence: component split suggestion
+    
+    Returns: [
+      {"id": "CDX-001", "status": "fixed", "essence": "...", "commit": "..."},
+      {"id": "GMN-004", "status": "rejected", "essence": "...", "reason": "...", "priority": "P2"}
+    ]
+    """
+    if not md_text:
+        return []
+    
+    lines = md_text.splitlines()
+    decisions = []
+    
+    current_status = None  # "fixed" or "rejected"
+    current_entry = None
+    
+    for raw in lines:
+        line = raw.rstrip("\n")
+        
+        # Detect status section headers
+        if line.strip().lower() == "### fixed":
+            current_status = "fixed"
+            if current_entry:
+                decisions.append(current_entry)
+                current_entry = None
+            continue
+        
+        if line.strip().lower() == "### rejected":
+            current_status = "rejected"
+            if current_entry:
+                decisions.append(current_entry)
+                current_entry = None
+            continue
+        
+        # Reset on new round headers
+        if line.startswith("## Round "):
+            if current_entry:
+                decisions.append(current_entry)
+            current_entry = None
+            continue
+        
+        # Start new entry
+        if line.startswith("- id:") and current_status:
+            if current_entry:
+                decisions.append(current_entry)
+            fid = line.split(":", 1)[1].strip()
+            current_entry = {"id": fid, "status": current_status}
+            continue
+        
+        # Parse entry fields
+        if current_entry and line.startswith("  "):
+            m = re.match(r"^\s{2}([a-zA-Z][a-zA-Z0-9]*):\s*(.*)$", line)
+            if m:
+                k = m.group(1).strip()
+                v = m.group(2).strip()
+                current_entry[k] = v
+    
+    # Don't forget last entry
+    if current_entry:
+        decisions.append(current_entry)
+    
+    return decisions
+
+
+def _filter_by_decision_log(findings, prior_decisions, escalation_groups):
+    """
+    Filter findings based on decision log.
+    
+    Rules:
+    1. Filter out findings matching any "fixed" decision (by escalation group)
+    2. Filter out findings matching "rejected" decisions UNLESS in escalation group
+    
+    Args:
+      findings: list of finding dicts
+      prior_decisions: list from _parse_decision_log()
+      escalation_groups: list of [rejected_id, new_finding_id] pairs
+    
+    Returns:
+      filtered list of findings
+    """
+    if not prior_decisions:
+        return findings
+    
+    escalation_map = {}
+    for group in escalation_groups:
+        if len(group) >= 2:
+            prior_id = group[0]
+            new_finding_ids = group[1:]
+            if prior_id not in escalation_map:
+                escalation_map[prior_id] = set()
+            escalation_map[prior_id].update(new_finding_ids)
+    
+    fixed_ids = set()
+    rejected_ids = set()
+    
+    for dec in prior_decisions:
+        status = dec.get("status", "").lower()
+        fid = dec.get("id", "").strip()
+        if not fid:
+            continue
+        
+        if status == "fixed":
+            fixed_ids.add(fid)
+        elif status == "rejected":
+            rejected_ids.add(fid)
+    
+    filtered = []
+    for f in findings:
+        fid = f.get("id", "").strip()
+        if not fid:
+            continue
+        
+        should_filter = False
+        
+        if fid in fixed_ids:
+            should_filter = True
+        
+        if not should_filter:
+            for fixed_id in fixed_ids:
+                if fixed_id in escalation_map and fid in escalation_map[fixed_id]:
+                    should_filter = True
+                    break
+        
+        if not should_filter:
+            if fid in rejected_ids:
+                should_filter = True
+            
+            for rejected_id in rejected_ids:
+                if rejected_id in escalation_map and fid in escalation_map[rejected_id]:
+                    should_filter = False
+                    break
+        
+        if not should_filter:
+            filtered.append(f)
+    
+    return filtered
+
+
 def _parse_review_findings(md_text):
     lines = md_text.splitlines()
     items = []
@@ -491,6 +687,8 @@ def main(argv):
     parser.add_argument("--final-report")
     parser.add_argument("--duplicate-groups-json")
     parser.add_argument("--duplicate-groups-b64")
+    parser.add_argument("--decision-log-file")
+    parser.add_argument("--escalation-groups-b64")
 
     try:
         args = parser.parse_args(argv)
@@ -571,6 +769,21 @@ def main(argv):
     if not duplicate_groups:
         duplicate_groups = _parse_duplicate_groups_b64(args.duplicate_groups_b64 or "")
     merged_findings, merged_map = _merge_duplicates(all_findings, duplicate_groups)
+    
+    decision_log_file = (args.decision_log_file or "").strip() or None
+    prior_decisions = []
+    if decision_log_file:
+        try:
+            decision_log_md = _read_cache_text(decision_log_file)
+            prior_decisions = _parse_decision_log(decision_log_md)
+        except Exception:
+            pass
+    
+    escalation_groups = _parse_escalation_groups_b64(args.escalation_groups_b64 or "")
+    
+    if prior_decisions:
+        merged_findings = _filter_by_decision_log(merged_findings, prior_decisions, escalation_groups)
+    
     counts = _counts(merged_findings)
 
     must_fix = [f for f in merged_findings if _priority_rank(f.get("priority")) <= 2]
