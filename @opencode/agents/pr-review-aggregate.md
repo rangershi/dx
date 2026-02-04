@@ -61,9 +61,37 @@ runId: abcdef123456
 {"duplicateGroups":[["CDX-001","CLD-003"],["GMN-002","CLD-005","CDX-004"]]}
 ```
 
+## 智能匹配（仅在模式 A + decision-log 存在时）
+
+如果 decision-log（`./.cache/decision-log-pr<PR_NUMBER>.md`）存在，你需要基于 LLM 判断每个新 finding 与已决策问题的本质是否相同，从而生成 **escalation_groups** 参数。
+
+**流程**：
+
+1. 读取 decision-log，提取已 rejected 问题的 `essence` 字段
+2. 逐个新 finding，与所有已 rejected 问题的 essence 做语义比对（使用 LLM）
+3. 判断是否"问题本质相同"（即便表述不同）
+4. 收集可升级的问题（重新质疑阈值）：
+   - **升级阈值**：优先级差距 ≥ 2 级
+   - 例如：已 rejected P3 but finding 为 P1 → 可升级质疑
+   - 例如：已 rejected P2 but finding 为 P0 → 可升级质疑
+   - 例如：已 rejected P2 but finding 为 P1 → 不升级（仅差 1 级）
+5. 生成**一行 JSON**（不要代码块、不要解释文字、不要换行），结构如下：
+
+```json
+{"escalationGroups":[["CDX-001"],["GMN-002","CLD-005"]]}
+```
+
+其中每个组表示「可以作为已 rejected 问题的升级质疑」的 finding ID 集合。若无可升级问题，输出空数组：
+
+```json
+{"escalationGroups":[]}
+```
+
+注意：escalation_groups JSON **不是你的最终输出**，它只用于生成 `--escalation-groups-b64` 传给脚本。
+
 ## 调用脚本（强制）
 
-模式 A（带 reviewFile + 重复分组）：
+模式 A（带 reviewFile + 重复分组 + 智能匹配）：
 
 ```bash
 python3 ~/.opencode/agents/pr_review_aggregate.py \
@@ -74,8 +102,16 @@ python3 ~/.opencode/agents/pr_review_aggregate.py \
   --review-file <REVIEW_FILE_1> \
   --review-file <REVIEW_FILE_2> \
   --review-file <REVIEW_FILE_3> \
-  --duplicate-groups-b64 <BASE64_JSON>
+  --duplicate-groups-b64 <BASE64_JSON> \
+  --decision-log-file ./.cache/decision-log-pr<PR_NUMBER>.md \
+  --escalation-groups-b64 <BASE64_JSON>
 ```
+
+**参数说明**：
+
+- `--duplicate-groups-b64`：base64 编码的 JSON，格式同上，例如 `eyJkdXBsaWNhdGVHcm91cHMiOltbIkNEWC0wMDEiLCJDTEQtMDAzIl1dfQ==`
+- `--decision-log-file`：decision-log 文件路径（可选；若不存在则跳过智能匹配逻辑）
+- `--escalation-groups-b64`：base64 编码的 escalation groups JSON，格式如上，例如 `eyJlc2NhbGF0aW9uR3JvdXBzIjpbWyJDRFgtMDAxIl1dfQ==`
 
 模式 B（带 fixReportFile）：
 
