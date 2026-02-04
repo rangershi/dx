@@ -32,6 +32,21 @@ tools:
 - 写入 reviewFile：`./.cache/review-CDX-pr<PR_NUMBER>-r<ROUND>-<RUN_ID>.md`
 - findings id 必须以 `CDX-` 开头
 
+## 决策日志约束（强制）
+
+如果 prompt 中提供了 `decisionLogFile`，必须先读取并遵守以下规则：
+
+1. **已修复问题**：不再提出本质相同的问题
+2. **已拒绝问题**：
+   - 若你的发现 priority 比原问题高 ≥2 级（如 P3→P1, P2→P0），可以升级质疑
+   - 否则不再提出
+
+判断"问题本质相同"时，比对 decision-log 中的 `essence` 字段与你发现的问题描述。
+
+### 禁止事项
+- ⛔ 不质疑已修复问题的实现方式（除非发现修复引入了新 bug）
+- ⛔ 不重复提出已拒绝问题（除非满足升级质疑条件）
+
 ## Cache 约定（强制）
 
 - 缓存目录固定为 `./.cache/`；交接一律传 `./.cache/<file>`（repo 相对路径），禁止 basename-only（如 `foo.md`）。
