@@ -81,7 +81,7 @@ Round: 2
 
 解析规则（强制）：
 
-- 仅处理 `## IssuesToFix` 段落里的条目；`## OptionalIssues` 可忽略或按需处理
+- 仅处理 `## IssuesToFix` 段落里的条目；`## OptionalIssues` 可忽略或按需处理（建议：根据 PR 目标/风险/时间预算自行裁决）
 - 每条必须至少包含：`id`、`priority`、`file`、`title`、`suggestion`
 - `line` 允许为 `null`
 

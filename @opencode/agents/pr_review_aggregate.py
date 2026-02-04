@@ -23,7 +23,9 @@
 # - Comment body must NOT contain local filesystem paths (this script scrubs cache paths, $HOME, and repo absolute paths).
 #
 # fixFile rules:
-# - fixFile includes ONLY P0/P1/P2 findings.
+# - fixFile includes all findings, split into:
+#   - IssuesToFix: P0/P1 (must fix)
+#   - OptionalIssues: P2/P3 (pr-fix may decide)
 # - Each merged duplicate group keeps ONE canonical id; merged IDs are appended into canonical description.
 # - Do NOT rewrite id prefixes (CDX-/CLD-/GMN-); preserve reviewer-provided finding IDs.
 
@@ -595,7 +597,7 @@ def _render_mode_a_comment(pr_number, round_num, run_id, counts, must_fix, merge
     lines.append("")
 
     if must_fix:
-        lines.append("## Must Fix (P0/P1/P2)")
+        lines.append("## Must Fix (P0/P1)")
         lines.append("")
         for f in must_fix:
             fid = f.get("id") or ""
@@ -614,7 +616,7 @@ def _render_mode_a_comment(pr_number, round_num, run_id, counts, must_fix, merge
     else:
         lines.append("## Result")
         lines.append("")
-        lines.append("No P0/P1/P2 issues found.")
+        lines.append("No P0/P1 issues found.")
         lines.append("")
 
     lines.append("<details>")
@@ -660,7 +662,7 @@ def _render_final_comment(pr_number, round_num, run_id, status):
     if status == "RESOLVED":
         lines.append("### Status: ✅ All issues resolved")
         lines.append("")
-        lines.append("All P0/P1/P2 issues from the automated review have been addressed.")
+        lines.append("All P0/P1 issues from the automated review have been addressed.")
         lines.append("The PR is ready for human review and merge.")
     else:
         lines.append("### Status: ⚠️ Max rounds reached")
@@ -786,7 +788,8 @@ def main(argv):
     
     counts = _counts(merged_findings)
 
-    must_fix = [f for f in merged_findings if _priority_rank(f.get("priority")) <= 2]
+    must_fix = [f for f in merged_findings if _priority_rank(f.get("priority")) <= 1]
+    optional = [f for f in merged_findings if _priority_rank(f.get("priority")) >= 2]
     stop = len(must_fix) == 0
 
     body = _render_mode_a_comment(pr_number, round_num, run_id, counts, must_fix, merged_map, raw_reviews)
@@ -811,6 +814,28 @@ def main(argv):
     lines.append("## IssuesToFix")
     lines.append("")
     for f in must_fix:
+        fid = f.get("id") or ""
+        pri = (f.get("priority") or "P3").strip()
+        cat = (f.get("category") or "quality").strip()
+        file = (f.get("file") or "<unknown>").strip()
+        line = (f.get("line") or "null").strip()
+        title = (f.get("title") or "").strip()
+        desc = (f.get("description") or "").replace("\n", "\\n").strip()
+        sugg = (f.get("suggestion") or "(no suggestion provided)").replace("\n", "\\n").strip()
+
+        lines.append(f"- id: {fid}")
+        lines.append(f"  priority: {pri}")
+        lines.append(f"  category: {cat}")
+        lines.append(f"  file: {file}")
+        lines.append(f"  line: {line}")
+        lines.append(f"  title: {title}")
+        lines.append(f"  description: {desc}")
+        lines.append(f"  suggestion: {sugg}")
+
+    lines.append("")
+    lines.append("## OptionalIssues")
+    lines.append("")
+    for f in optional:
         fid = f.get("id") or ""
         pri = (f.get("priority") or "P3").strip()
         cat = (f.get("category") or "quality").strip()

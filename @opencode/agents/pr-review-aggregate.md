@@ -134,3 +134,10 @@ python3 ~/.opencode/agents/pr_review_aggregate.py \
 - **失败/异常时**：
   - 若脚本 stdout 已输出合法 JSON（包含 `error` 或其他字段）→ 仍然**原样返回该 JSON**。
   - 若脚本未输出合法 JSON / 退出异常 → 仅输出一行 JSON：`{"error":"PR_REVIEW_AGGREGATE_AGENT_FAILED"}`（必要时可加 `detail` 字段）。
+
+## fixFile 结构（补充说明）
+
+脚本在模式 A 下生成的 fixFile 分为两段：
+
+- `## IssuesToFix`：只包含 P0/P1（必须修）
+- `## OptionalIssues`：包含 P2/P3（由 pr-fix 自主决定是否修复/或拒绝并说明原因）

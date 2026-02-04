@@ -77,6 +77,8 @@ agent: sisyphus
 - 特别关注: 逻辑、安全、性能、可维护性
 - 同时要注意 pr 前面轮次的 修复和讨论，对于已经拒绝、已修复的问题不要反复的提出
 - 同时也要注意fix的过程中有没有引入新的问题。
+
+备注：fixFile 分为 `IssuesToFix`（P0/P1，必须修）与 `OptionalIssues`（P2/P3，pr-fix 自主裁决）。
 - 每个 reviewer 输出：`reviewFile: ./.cache/<file>.md`（Markdown）
 
 3. Task: `pr-review-aggregate`

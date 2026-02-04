@@ -128,6 +128,63 @@ target（端）不写死，由 `env-policy.jsonc.targets` 定义；`commands.jso
 
 查看 `example/`：包含一个最小可读的 `dx/config` 配置示例，以及如何在一个 pnpm+nx monorepo 中接入 dx。
 
+## PR Review Loop（自动评审-修复闭环）
+
+dx 内置一套 PR 评审自动化工作流：并行评审 → 聚合结论 → 生成修复清单 → 自动修复 → 再评审，最多循环 3 轮，用于让 PR 更快收敛。
+
+### 什么时候用
+
+- PR 变更较大、想要更系统地覆盖安全/性能/可维护性问题
+- 希望在 CI 通过的前提下，把评审建议落成可执行的修复清单（fixFile）
+- 希望避免同一个问题在不同轮次被反复提出（通过 Decision Log 机制）
+
+### 如何运行
+
+在创建 PR 后执行：
+
+```
+/pr-review-loop --pr <PR_NUMBER>
+```
+
+更多命令说明见：`@opencode/commands/pr-review-loop.md`。
+
+提示：在创建 PR 的流程中也会给出快捷入口，见：`@opencode/commands/git-commit-and-pr.md`。
+
+### 工作流概览
+
+- 预检（`pr-precheck`）：先做编译/预检 gate，不通过则进入修复再预检（最多 2 次）
+- 获取上下文（`pr-context`）：生成本轮上下文缓存 `contextFile`
+- 并行评审（4 个 reviewer）：`codex-reviewer` / `claude-reviewer` / `gemini-reviewer` / `gh-thread-reviewer`
+- 聚合（`pr-review-aggregate`）：合并各 reviewer 结果、去重、输出 `fixFile`，并发布本轮 Review Summary
+- 修复（`pr-fix`）：按 `fixFile` 逐条修复（每条 findingId 单独 commit + push），输出 `fixReportFile`
+- 发布修复报告（`pr-review-aggregate` 模式 B）：发布 Fix Report
+
+备注：每轮发布到 PR 的评论都会带 `<!-- pr-review-loop-marker -->`，用于幂等与避免反复采集机器人评论。
+
+### 缓存文件（项目内 ./\.cache/）
+
+该流程的中间产物都写入项目内 `./.cache/`，并在 agent/命令之间传递 repo 相对路径：
+
+- `./.cache/pr-context-pr<PR>-r<ROUND>-<RUN_ID>.md`（contextFile）
+- `./.cache/review-<REVIEWER>-pr<PR>-r<ROUND>-<RUN_ID>.md`（reviewFile）
+- `./.cache/fix-pr<PR>-r<ROUND>-<RUN_ID>.md`（fixFile）
+- `./.cache/fix-report-pr<PR>-r<ROUND>-<RUN_ID>.md`（fixReportFile）
+
+### Decision Log（跨轮次决策日志，用于收敛）
+
+为了解决“第一轮拒绝的问题在后续轮次反复出现”的问题，PR Review Loop 使用 Decision Log 持久化每轮的决策：
+
+- 文件：`./.cache/decision-log-pr<PR_NUMBER>.md`
+- 生成者：`pr-fix` 在修复完成后创建/追加（append-only，禁止覆盖历史）
+- 内容：记录每轮的 Fixed/Rejected，以及 `essence`（问题本质的一句话描述，用于后续智能匹配）
+
+在后续轮次：
+
+- reviewers 若收到 `decisionLogFile`，必须读取并遵守：已修复不再提、已拒绝不再提（除非严重性升级）
+- aggregate 在模式 A 中基于 LLM 对比 `essence` 做“问题本质相同”的判断，并生成 `escalation_groups` 入参给脚本
+
+升级质疑规则：只有当新 finding 的优先级比历史 rejected 高 ≥2 级（例如 P3→P1、P2→P0）时，才允许重新打开。
+
 ## 命令
 
 dx 的命令由 `dx/config/commands.json` 驱动，并且内置了一些 internal runner（避免项目侧依赖任何 `scripts/lib/*.js`）：
