@@ -58,15 +58,21 @@ agent: sisyphus
 - 取出：`contextFile`、`runId`、`headOid`（如有）
 - **CRITICAL**: 必须等待此 Task 成功完成并获取到 `contextFile` 后，才能进入 Step 2
 
-2. Task（并行）: `codex-reviewer` + `claude-reviewer` + `gemini-reviewer` + `gh-thread-reviewer` **（依赖 Step 1 的 contextFile）**
+**检查 Decision Log**：
+- 检查是否存在 `./.cache/decision-log-pr{{PR_NUMBER}}.md`
+- 如存在，将路径记录为 `decisionLogFile`（用于后续步骤）
+- 如不存在，`decisionLogFile` 为空或不传递
 
-- **DEPENDENCY**: 这些 reviewers 依赖 Step 1 返回的 `contextFile`，因此**必须等 Step 1 完成后才能并行启动**
+2. Task（并行）: `codex-reviewer` + `claude-reviewer` + `gemini-reviewer` + `gh-thread-reviewer` **（依赖 Step 1 的 contextFile 和 decisionLogFile）**
+
+- **DEPENDENCY**: 这些 reviewers 依赖 Step 1 返回的 `contextFile` 和 `decisionLogFile`（如存在），因此**必须等 Step 1 完成后才能并行启动**
 - 每个 reviewer prompt 必须包含：
   - `PR #{{PR_NUMBER}}`
   - `round: <ROUND>`
   - `runId: <RUN_ID>`（来自 Step 1 的输出，必须透传，禁止自行生成）
   - `contextFile: ./.cache/<file>.md`（来自 Step 1 的输出）
-- reviewer 默认读 `contextFile`；必要时允许用 `git/gh` 只读命令拿 diff
+  - `decisionLogFile: ./.cache/decision-log-pr{{PR_NUMBER}}.md`（如存在，来自检查后得出）
+- reviewer 默认读 `contextFile`；如果 `decisionLogFile` 存在，reviewer 应在 prompt 中提供该文件路径以参考前轮决策；必要时允许用 `git/gh` 只读命令拿 diff
 - 忽略问题：1.格式化代码引起的噪音 2.已经lint检查以外的格式问题 3.忽略单元测试不足的问题
 - 特别关注: 逻辑、安全、性能、可维护性
 - 同时要注意 pr 前面轮次的 修复和讨论，对于已经拒绝、已修复的问题不要反复的提出
@@ -75,7 +81,7 @@ agent: sisyphus
 
 3. Task: `pr-review-aggregate`
 
-- prompt 必须包含：`PR #{{PR_NUMBER}}`、`round: <ROUND>`、`runId: <RUN_ID>`、`contextFile: ./.cache/<file>.md`、以及 1+ 条 `reviewFile: ./.cache/<file>.md`
+- prompt 必须包含：`PR #{{PR_NUMBER}}`、`round: <ROUND>`、`runId: <RUN_ID>`、`contextFile: ./.cache/<file>.md`、以及 1+ 条 `reviewFile: ./.cache/<file>.md`、以及 `decisionLogFile: ./.cache/decision-log-pr{{PR_NUMBER}}.md`（如存在）
 - 输出：`{"stop":true}` 或 `{"stop":false,"fixFile":"..."}`
 - 若 `stop=true`：本轮结束并退出循环
 - **唯一性约束**: 每轮只能发布一次 Review Summary；脚本内置幂等检查，重复调用不会重复发布
@@ -96,6 +102,10 @@ agent: sisyphus
 - prompt 必须包含：`PR #{{PR_NUMBER}}`、`round: <ROUND>`、`runId: <RUN_ID>`、`fixReportFile: ./.cache/<file>.md`
 - 输出：`{"ok":true}`
 - **唯一性约束**: 每轮只能发布一次 Fix Report；脚本内置幂等检查，重复调用不会重复发布
+
+**Decision Log 更新**：
+- `pr-fix` agent 在修复过程中会在 `./.cache/decision-log-pr{{PR_NUMBER}}.md` 中追加本轮决策（Fixed/Rejected）
+- 下一轮 review 将自动使用更新后的 decision-log，避免重复提出已决策问题
 
 6. 下一轮
 
