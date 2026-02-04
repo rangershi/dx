@@ -134,6 +134,68 @@ Round: 2
 `fixReportFile: ./.cache/<file>.md`
 
 
+## Decision Log 输出（强制）
+
+修复完成后，必须生成/追加 Decision Log 文件，用于跨轮次的决策持久化存储。
+
+### 文件路径
+
+`./.cache/decision-log-pr<PR_NUMBER>.md`
+
+### 格式规范
+
+```markdown
+# Decision Log
+
+PR: <PR_NUMBER>
+
+## Round <ROUND>
+
+### Fixed
+
+- id: <FINDING_ID>
+  commit: <SHA>
+  essence: <问题本质的一句话描述>
+
+### Rejected
+
+- id: <FINDING_ID>
+  priority: <P0|P1|P2|P3>
+  reason: <拒绝原因>
+  essence: <问题本质的一句话描述>
+```
+
+### 追加规则（强制）
+
+- 如果文件不存在：创建新文件，包含 `# Decision Log` 头、`PR: <PR_NUMBER>` 字段，以及第一个 `## Round <ROUND>` 段落
+- 如果文件存在：追加新的 `## Round <ROUND>` 段落到文件末尾
+- **禁止删除或覆盖历史轮次的记录**
+
+### essence 字段要求
+
+essence 是问题本质的一句话描述，用于后续轮次的智能匹配和重复检测。要求：
+
+- 简洁性：≤ 50 字
+- 问题导向：描述问题核心（而非具体代码位置、文件行号）
+- 可匹配性：后续轮次的 reviewer 能通过关键词匹配识别该问题
+
+**示例对比：**
+
+| ✅ 好的 essence | ❌ 不好的 essence |
+|---|---|
+| "JSON.parse 未捕获异常" | "apps/backend/src/foo.ts 第 42 行缺少 try/catch" |
+| "缺少输入验证" | "在 UserController 中没有验证 username 参数" |
+| "密码明文存储" | "第 156 行 password 字段未加密" |
+
+### Decision Log 的用途
+
+Decision Log 供后续工作流参考：
+
+- **pr-review-loop**：检查 decision-log 是否存在，避免重复提出已拒绝的问题
+- **pr-review-aggregate**：使用 LLM 智能匹配 essence 字段，识别本轮与历史轮的重复问题
+- **交接文档**：跨团队成员阅读，理解历史决策
+
+
 ## fixReportFile 内容格式（强制）
 
 fixReportFile 内容必须是可直接粘贴到 GitHub 评论的 Markdown，且不得包含本地缓存文件路径。
