@@ -1,7 +1,7 @@
 ---
 description: aggregate PR reviews + create fix file
 mode: subagent
-model: openai/gpt-5.1-codex-mini
+model: github-copilot/claude-sonnet-4.5
 temperature: 0.1
 tools:
   bash: true
@@ -133,7 +133,7 @@ python3 ~/.opencode/agents/pr_review_aggregate.py \
   - 禁止：前后空行
 - **失败/异常时**：
   - 若脚本 stdout 已输出合法 JSON（包含 `error` 或其他字段）→ 仍然**原样返回该 JSON**。
-  - 若脚本未输出合法 JSON / 退出异常 → 仅输出一行 JSON：`{"error":"PR_REVIEW_AGGREGATE_AGENT_FAILED"}`（必要时可加 `detail` 字段）。
+  - 若脚本未输出合法 JSON / 退出异常 → 仅返回一行 JSON：`{"error":"PR_REVIEW_AGGREGATE_AGENT_FAILED"}`（必要时可加 `detail` 字段）。
 
 ## fixFile 结构（补充说明）
 
