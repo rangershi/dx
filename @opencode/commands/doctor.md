@@ -6,185 +6,228 @@ agent: build
 
 ---
 
-## Step 0: 强制安装 dx CLI
+## Step 0: Bootstrap（dx + 模板 + pnpm）
 
-**无论当前是否安装，必须执行：**
+目标：
 
-```bash
-pnpm add -g @ranger1/dx@latest  && dx initial
-```
-
----
-
-## Step 1: 并行检测
-
-**同时执行以下 5 个 Bash 调用（真正并行）：**
+- dx 安装/升级到最新
+- 刷新 `~/.opencode/commands/*`（确保 `opencode_attach.py` 可用）
 
 ```bash
-# 批次 1: CLI 版本检测
-echo "=== CLI_VERSIONS ===";
-echo "opencode:" && (which opencode && opencode --version 2>/dev/null || echo "NOT_FOUND");
-echo "dx:" && (which dx && dx --version 2>/dev/null || echo "NOT_FOUND");
-echo "rg:" && (which rg && rg --version 2>/dev/null | head -n 1 || echo "NOT_FOUND");
-echo "agent-browser:" && (which agent-browser && agent-browser --version 2>/dev/null || echo "NOT_FOUND");
-```
+set -euo pipefail
 
-```bash
-# 批次 2: 项目文件检测
-echo "=== PROJECT_FILES ===";
-echo "AGENTS.md:" && (test -f AGENTS.md && echo "FOUND" || echo "NOT_FOUND");
-```
-
-```bash
-# 批次 3: OpenCode 插件检测
-# 注意:插件名可能带版本号(如 @1.3.0),使用模糊匹配
-echo "=== OPENCODE_PLUGINS ===";
-echo "oh-my-opencode:" && (opencode plugin list 2>/dev/null | grep -q 'oh-my-opencode' && echo "INSTALLED" || echo "NOT_INSTALLED");
-echo "opencode-openai-codex-auth:" && (opencode plugin list 2>/dev/null | grep -q 'opencode-openai-codex-auth' && echo "INSTALLED" || echo "NOT_INSTALLED");
-```
-
-```bash
-# 批次 4: attach 配置（统一）
-echo "=== OPENCODE_ATTACH ===";
-echo "attach:" && (python3 ~/.opencode/commands/opencode_attach.py --dry-run >/dev/null 2>&1 && echo "READY" || echo "NOT_READY");
-```
-
-```bash
-# 批次 5: Python 检测（python3 + python 软链接）
-echo "=== PYTHON ===";
-echo "python3:" && (which python3 && python3 --version 2>/dev/null || echo "NOT_FOUND");
-echo "python:" && (which python && python --version 2>/dev/null || echo "NOT_FOUND");
-```
-
----
-
-## Step 2: 输出报告
-
-汇总结果，输出表格：
-
-```
-工具                                  | 状态     | 版本
-opencode                              | <状态>   | <版本>
-dx                                    | <状态>   | <版本>
-rg                                    | <状态>   | <版本>
-python3                               | <状态>   | <版本>
-python(软链接)                         | <状态>   | <版本>
-AGENTS.md                             | <状态>   | -
-oh-my-opencode 插件                   | <状态>   | -
-opencode-openai-codex-auth 插件       | <状态>   | -
-agent-browser                         | <状态>   | <版本>
-attach（全局配置写入）                 | <状态>   | -
-```
-
----
-
-## Step 3: 统一处理缺失项
-
-**如检测到任何缺失项，统一询问一次：**
-
-`AskUserQuestion`: 检测到以下缺失项，是否自动安装/配置所有？
-
-确认后按顺序处理（需要直接执行对应安装/配置命令，不要只输出提示）：
-
-### 3.1 opencode CLI 未安装
-
-执行安装：
-
-```bash
-# brew 优先
-brew install opencode || npm install -g opencode
-```
-
-### 3.2 AGENTS.md 未找到
-
-提示用户：
-
-- AGENTS.md 文件不存在，OpenCode 需要此文件作为项目指令入口
-- 建议创建或检查文件路径
-
-### 3.3 rg（ripgrep）未安装
-
-执行安装（幂等：已安装会跳过；缺少包管理器会报错并提示手动安装）：
-
-```bash
-set -e
-
-if command -v rg >/dev/null 2>&1; then
-  rg --version 2>/dev/null | head -n 1 || true
-  exit 0
+# 必要前提：node + corepack（用于 pnpm）
+if ! command -v node >/dev/null 2>&1; then
+  echo "ERROR: node NOT_FOUND (need Node.js >= 20)"
+  echo "macOS: brew install node"
+  echo "Debian/Ubuntu: curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash - && sudo apt-get install -y nodejs"
+  exit 1
 fi
 
-if command -v brew >/dev/null 2>&1; then
-  brew install ripgrep
-elif command -v apt-get >/dev/null 2>&1; then
-  sudo apt-get update
+if ! command -v pnpm >/dev/null 2>&1; then
+  corepack enable >/dev/null 2>&1 || true
+  corepack prepare pnpm@latest --activate
+fi
+
+# 安装/升级 dx 到最新（幂等）
+pnpm add -g @ranger1/dx@latest
+
+# 备份后刷新模板（避免覆盖导致不可回退）
+ts="$(date +%Y%m%d%H%M%S)"
+if [ -d "$HOME/.opencode/commands" ]; then
+  cp -a "$HOME/.opencode/commands" "$HOME/.opencode/commands.bak.${ts}" 2>/dev/null || true
+fi
+if [ -d "$HOME/.opencode/agents" ]; then
+  cp -a "$HOME/.opencode/agents" "$HOME/.opencode/agents.bak.${ts}" 2>/dev/null || true
+fi
+
+dx initial
+```
+
+---
+
+## Step 1: 快速检测（单次 Bash）
+
+目标：一次 Bash 输出完整状态表，减少 tool 调用与 token。
+
+```bash
+set -euo pipefail
+
+os="$(uname -s 2>/dev/null || echo unknown)"
+pm="none"
+if command -v brew >/dev/null 2>&1; then pm="brew"; fi
+if command -v apt-get >/dev/null 2>&1; then pm="apt"; fi
+
+ver() {
+  # usage: ver <bin> <cmd>
+  b="$1"; shift
+  if command -v "$b" >/dev/null 2>&1; then
+    ("$@" 2>/dev/null | head -n 1) || true
+  else
+    echo "NOT_FOUND"
+  fi
+}
+
+has_agents="NOT_FOUND"; [ -f AGENTS.md ] && has_agents="FOUND"
+
+dx_v="$(ver dx dx --version)"
+opencode_v="$(ver opencode opencode --version)"
+rg_v="$(ver rg rg --version)"
+agent_browser_v="$(ver agent-browser agent-browser --version)"
+py3_v="$(ver python3 python3 --version)"
+py_v="$(ver python python --version)"
+
+attach_status="NOT_READY"
+if command -v python3 >/dev/null 2>&1 && [ -f "$HOME/.opencode/commands/opencode_attach.py" ]; then
+  python3 "$HOME/.opencode/commands/opencode_attach.py" --dry-run >/dev/null 2>&1 && attach_status="READY" || true
+fi
+
+# 插件以“配置是否就绪”为准（真正安装由 opencode 启动时自动完成）
+cfg_opencode="$HOME/.config/opencode/opencode.json"
+plug_oh="NOT_CONFIGURED"
+plug_codex="NOT_CONFIGURED"
+plug_antigravity="NOT_CONFIGURED"
+if [ -f "$cfg_opencode" ]; then
+  grep -q 'oh-my-opencode' "$cfg_opencode" && plug_oh="CONFIGURED" || true
+  grep -q 'opencode-openai-codex-auth' "$cfg_opencode" && plug_codex="CONFIGURED" || true
+  grep -q 'opencode-antigravity-auth' "$cfg_opencode" && plug_antigravity="CONFIGURED" || true
+fi
+
+echo "OS: ${os} | PM: ${pm}"
+echo
+printf '%-34s | %-12s | %s\n' "tool" "status" "version"
+printf '%-34s | %-12s | %s\n' "opencode" "$( [ "$opencode_v" = NOT_FOUND ] && echo MISSING || echo OK )" "$opencode_v"
+printf '%-34s | %-12s | %s\n' "dx" "$( [ "$dx_v" = NOT_FOUND ] && echo MISSING || echo OK )" "$dx_v"
+printf '%-34s | %-12s | %s\n' "rg" "$( [ "$rg_v" = NOT_FOUND ] && echo MISSING || echo OK )" "$rg_v"
+printf '%-34s | %-12s | %s\n' "agent-browser" "$( [ "$agent_browser_v" = NOT_FOUND ] && echo MISSING || echo OK )" "$agent_browser_v"
+printf '%-34s | %-12s | %s\n' "python3" "$( [ "$py3_v" = NOT_FOUND ] && echo MISSING || echo OK )" "$py3_v"
+printf '%-34s | %-12s | %s\n' "python (softlink)" "$( [ "$py_v" = NOT_FOUND ] && echo MISSING || echo OK )" "$py_v"
+printf '%-34s | %-12s | %s\n' "AGENTS.md" "$has_agents" "-"
+printf '%-34s | %-12s | %s\n' "attach (global config)" "$attach_status" "-"
+printf '%-34s | %-12s | %s\n' "plugin: oh-my-opencode" "$plug_oh" "-"
+printf '%-34s | %-12s | %s\n' "plugin: opencode-openai-codex-auth" "$plug_codex" "-"
+printf '%-34s | %-12s | %s\n' "plugin: opencode-antigravity-auth" "$plug_antigravity" "-"
+
+missing=0
+for x in "$opencode_v" "$dx_v" "$rg_v" "$agent_browser_v" "$py3_v"; do
+  [ "$x" = NOT_FOUND ] && missing=1
+done
+[ "$attach_status" != READY ] && missing=1
+for x in "$plug_oh" "$plug_codex" "$plug_antigravity"; do
+  [ "$x" != CONFIGURED ] && missing=1
+done
+
+echo
+if [ "$missing" = 0 ]; then
+  echo "OK: all dependencies ready"
+else
+  echo "NEED_FIX: missing or not-ready items detected"
+fi
+```
+
+---
+
+## Step 2: 只问一次（缺失/升级）
+
+如果出现 `NEED_FIX`，只问一次：是否一键安装 + 升级到最新版本（包含插件配置 attach）。
+
+`AskUserQuestion`: 检测到缺失/未就绪项，是否一键修复并升级到最新版本？
+
+选项：
+
+- 一键修复（Recommended）
+- 跳过（只输出检测表）
+
+---
+
+## Step 3: 一键修复（安装 + 升级到最新）
+
+确认后直接执行以下脚本（幂等；尽量走包管理器升级；插件用 attach 配置确保可自动安装/更新）：
+
+```bash
+set -euo pipefail
+
+os="$(uname -s 2>/dev/null || echo unknown)"
+has_brew=0; command -v brew >/dev/null 2>&1 && has_brew=1
+has_apt=0; command -v apt-get >/dev/null 2>&1 && has_apt=1
+
+need_sudo=0
+if [ "$has_apt" = 1 ] && command -v sudo >/dev/null 2>&1; then
+  need_sudo=1
+fi
+
+if ! command -v pnpm >/dev/null 2>&1; then
+  corepack enable >/dev/null 2>&1 || true
+  corepack prepare pnpm@latest --activate
+fi
+
+# dx（始终升级到最新）
+pnpm add -g @ranger1/dx@latest
+
+if ! command -v dx >/dev/null 2>&1; then
+  echo "WARN: dx still NOT_FOUND (check PATH for pnpm global bin: pnpm bin -g)"
+fi
+
+# OpenCode 模板（确保 opencode_attach.py 存在）
+if [ ! -f "$HOME/.opencode/commands/opencode_attach.py" ]; then
+  dx initial
+fi
+
+# opencode CLI
+if [ "$os" = "Darwin" ] && [ "$has_brew" = 1 ]; then
+  brew update >/dev/null
+  brew tap anomalyco/tap >/dev/null 2>&1 || true
+  brew install anomalyco/tap/opencode >/dev/null 2>&1 || brew upgrade opencode >/dev/null 2>&1 || true
+else
+  # 官方支持 npm/bun/pnpm；这里统一用 pnpm
+  pnpm add -g opencode-ai@latest
+fi
+
+if ! command -v opencode >/dev/null 2>&1; then
+  echo "WARN: opencode still NOT_FOUND (check PATH for pnpm global bin: pnpm bin -g)"
+fi
+
+# ripgrep
+if [ "$has_brew" = 1 ]; then
+  brew install ripgrep >/dev/null 2>&1 || brew upgrade ripgrep >/dev/null 2>&1 || true
+elif [ "$has_apt" = 1 ] && [ "$need_sudo" = 1 ]; then
+  sudo apt-get update -y >/dev/null
   sudo apt-get install -y ripgrep
 else
-  echo "ripgrep (rg) NOT_FOUND, and no supported package manager (brew/apt-get) detected"
-  echo "Please install ripgrep manually: https://github.com/BurntSushi/ripgrep#installation"
-  exit 1
+  echo "WARN: no brew/apt-get; skip ripgrep auto-install"
 fi
 
-rg --version 2>/dev/null | head -n 1 || true
-```
-
-### 3.6 agent-browser 未安装
-
-执行安装：
-
-```bash
-npm install -g agent-browser && agent-browser install
-```
-
-### 3.6.1 python3 未安装
-
-执行安装：
-
-```bash
-# macOS (Homebrew)
-brew install python
-```
-
-### 3.6.2 python 命令缺失（需要软链接到 python3）
-
-如果 `python` 不存在但 `python3` 存在，执行：
-
-```bash
-set -e
-
-if command -v python >/dev/null 2>&1; then
-  python --version
-  exit 0
-fi
-
-PY3="$(command -v python3 2>/dev/null || true)"
-if [ -z "$PY3" ]; then
-  echo "python3 NOT_FOUND"
-  exit 1
-fi
-
-PY_DIR="$(dirname "$PY3")"
-if [ -w "$PY_DIR" ]; then
-  ln -sf "$PY3" "$PY_DIR/python"
-  echo "linked: $PY_DIR/python -> $PY3"
+# python3 (+ python 软链接尽量走系统包)
+if [ "$has_brew" = 1 ]; then
+  brew install python >/dev/null 2>&1 || brew upgrade python >/dev/null 2>&1 || true
+elif [ "$has_apt" = 1 ] && [ "$need_sudo" = 1 ]; then
+  sudo apt-get update -y >/dev/null
+  sudo apt-get install -y python3 python3-venv python3-pip python-is-python3
 else
-  ln -sf "$PY3" "$HOME/.local/bin/python"
-  echo "linked: $HOME/.local/bin/python -> $PY3"
-  echo "NOTE: ensure $HOME/.local/bin is in PATH"
+  echo "WARN: no brew/apt-get; skip python auto-install"
 fi
 
-python --version
+# agent-browser（安装/升级 + 安装 Chromium）
+if [ "$os" = "Darwin" ] && [ "$has_brew" = 1 ]; then
+  brew install agent-browser >/dev/null 2>&1 || brew upgrade agent-browser >/dev/null 2>&1 || true
+else
+  pnpm add -g agent-browser@latest
+fi
+
+if command -v agent-browser >/dev/null 2>&1; then
+  agent-browser install >/dev/null 2>&1 || agent-browser install --with-deps
+fi
+
+# attach（写入 ~/.config/opencode/*.json；自动备份 .bak.*）
+if command -v python3 >/dev/null 2>&1 && [ -f "$HOME/.opencode/commands/opencode_attach.py" ]; then
+  python3 "$HOME/.opencode/commands/opencode_attach.py"
+else
+  echo "ERROR: python3/opencode_attach.py NOT_READY"
+  exit 1
+fi
+
+echo "DONE"
 ```
-
-### 3.9 自动 attach（推荐）
-
-执行 attach（会自动覆盖/新建对应节点，其它不动，并生成备份文件）：
-
-```bash
-python3 ~/.opencode/commands/opencode_attach.py
-```
-
-
 
 ---
 
@@ -203,4 +246,4 @@ python3 ~/.opencode/commands/opencode_attach.py
 ```
 
 **修复完成后：**
-输出最终状态表格，确认所有项目均为 ✅
+重复执行 Step 1，输出最终状态表格，确认所有项目均为 OK/READY/CONFIGURED。
