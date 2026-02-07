@@ -7,18 +7,18 @@
   },
  "agents": {
     "sisyphus": {
-      "model": "openai/gpt-5.2",
+      "model": "openai/gpt-5.3-codex",
       "variant": "none"
     },
     "oracle": {
-      "model": "openai/gpt-5.2",
+      "model": "openai/gpt-5.3-codex",
       "variant": "high"
     },
     "librarian": {
-      "model": "github-copilot/gpt-5-mini"
+      "model": "openai/gpt-5.1-codex-mini"
     },
     "explore": {
-      "model": "github-copilot/gpt-5-mini"
+      "model": "openai/gpt-5.1-codex-mini"
     },
     "multimodal-looker": {
       "model": "github-copilot/gemini-3-flash-preview"
@@ -36,10 +36,10 @@
       "variant": "medium"
     },
     "atlas": {
-      "model": "openai/gpt-5.2-codex"
+      "model": "openai/gpt-5.3-codex"
     },
     "codex-reviewer": {
-      "model": "openai/gpt-5.2-codex",
+      "model": "openai/gpt-5.3-codex",
       "variant": "xhigh",
       "temperature": 0.1
     },
@@ -64,7 +64,7 @@
       "variant": "high"
     },
     "ultrabrain": {
-      "model": "openai/gpt-5.2-codex",
+      "model": "openai/gpt-5.3-codex",
       "variant": "xhigh"
     },
     "artistry": {
@@ -72,7 +72,7 @@
       "variant": "max"
     },
     "quick": {
-      "model": "github-copilot/claude-haiku-4.5"
+      "model": "openai/gpt-5.1-codex-mini"
     },
     "middle": {
       "model": "github-copilot/claude-sonnet-4.5"
@@ -82,7 +82,7 @@
       "variant": "medium"
     },
     "unspecified-high": {
-      "model": "openai/gpt-5.2",
+      "model": "openai/gpt-5.3-codex",
       "variant": "medium"
     },
     "writing": {

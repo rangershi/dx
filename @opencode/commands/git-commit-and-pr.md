@@ -223,8 +223,10 @@ git push -u origin HEAD
 #### 4.2 分析变更
 
 ```bash
-git log origin/master..HEAD --oneline
-git diff origin/master...HEAD --stat
+# 优先使用 origin/HEAD（远端默认分支），避免硬编码 main/master。
+# 如需指定基准分支，使用：/git-commit-and-pr --pr --base <BRANCH>
+git log origin/HEAD..HEAD --oneline
+git diff origin/HEAD...HEAD --stat
 ```
 
 #### 4.3 创建 PR

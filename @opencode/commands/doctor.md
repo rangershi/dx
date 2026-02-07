@@ -18,13 +18,14 @@ pnpm add -g @ranger1/dx@latest  && dx initial
 
 ## Step 1: 并行检测
 
-**同时执行以下 4 个 Bash 调用（真正并行）：**
+**同时执行以下 5 个 Bash 调用（真正并行）：**
 
 ```bash
 # 批次 1: CLI 版本检测
 echo "=== CLI_VERSIONS ===";
 echo "opencode:" && (which opencode && opencode --version 2>/dev/null || echo "NOT_FOUND");
 echo "dx:" && (which dx && dx --version 2>/dev/null || echo "NOT_FOUND");
+echo "rg:" && (which rg && rg --version 2>/dev/null | head -n 1 || echo "NOT_FOUND");
 echo "agent-browser:" && (which agent-browser && agent-browser --version 2>/dev/null || echo "NOT_FOUND");
 ```
 
@@ -65,6 +66,7 @@ echo "python:" && (which python && python --version 2>/dev/null || echo "NOT_FOU
 工具                                  | 状态     | 版本
 opencode                              | <状态>   | <版本>
 dx                                    | <状态>   | <版本>
+rg                                    | <状态>   | <版本>
 python3                               | <状态>   | <版本>
 python(软链接)                         | <状态>   | <版本>
 AGENTS.md                             | <状态>   | -
@@ -82,7 +84,7 @@ attach（全局配置写入）                 | <状态>   | -
 
 `AskUserQuestion`: 检测到以下缺失项，是否自动安装/配置所有？
 
-确认后按顺序处理：
+确认后按顺序处理（需要直接执行对应安装/配置命令，不要只输出提示）：
 
 ### 3.1 opencode CLI 未安装
 
@@ -99,6 +101,32 @@ brew install opencode || npm install -g opencode
 
 - AGENTS.md 文件不存在，OpenCode 需要此文件作为项目指令入口
 - 建议创建或检查文件路径
+
+### 3.3 rg（ripgrep）未安装
+
+执行安装（幂等：已安装会跳过；缺少包管理器会报错并提示手动安装）：
+
+```bash
+set -e
+
+if command -v rg >/dev/null 2>&1; then
+  rg --version 2>/dev/null | head -n 1 || true
+  exit 0
+fi
+
+if command -v brew >/dev/null 2>&1; then
+  brew install ripgrep
+elif command -v apt-get >/dev/null 2>&1; then
+  sudo apt-get update
+  sudo apt-get install -y ripgrep
+else
+  echo "ripgrep (rg) NOT_FOUND, and no supported package manager (brew/apt-get) detected"
+  echo "Please install ripgrep manually: https://github.com/BurntSushi/ripgrep#installation"
+  exit 1
+fi
+
+rg --version 2>/dev/null | head -n 1 || true
+```
 
 ### 3.6 agent-browser 未安装
 

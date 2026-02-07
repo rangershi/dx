@@ -10,7 +10,7 @@
   ],
   "agent": {
     "quick": {
-      "model": "github-copilot/gpt-5-mini"
+      "model": "openai/gpt-5.1-codex-mini"
     },
     "middle": {
       "model": "github-copilot/claude-sonnet-4.5"
@@ -22,5 +22,5 @@
       "*.env.*": "allow"
     }
   },  
-  "model": "openai/gpt-5.2"
+  "model": "openai/gpt-5.3-codex"
 }

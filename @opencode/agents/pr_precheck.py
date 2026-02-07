@@ -4,7 +4,7 @@
 # - Verify GitHub auth (gh)
 # - Read PR info (headRefName/baseRefName/mergeable)
 # - Checkout PR branch (gh pr checkout) if needed
-# - Fetch base branch (origin/<base>, fallback main/master)
+# - Fetch base branch (origin/<base>)
 # - If mergeable == CONFLICTING: return {"error":"PR_MERGE_CONFLICTS_UNRESOLVED"}
 # - Run dx cache clear
 # - Run dx lint and dx build all concurrently
@@ -227,17 +227,8 @@ def main():
         return 1
 
     if run(["git", "fetch", "origin", base]) != 0:
-        ok = False
-        for fallback in ("main", "master"):
-            if fallback == base:
-                continue
-            if run(["git", "fetch", "origin", fallback]) == 0:
-                base = fallback
-                ok = True
-                break
-        if not ok:
-            print(json.dumps({"error": "PR_BASE_REF_FETCH_FAILED"}))
-            return 1
+        print(json.dumps({"error": "PR_BASE_REF_FETCH_FAILED", "baseRefName": base}))
+        return 1
 
     if mergeable == "CONFLICTING":
         print(json.dumps({"error": "PR_MERGE_CONFLICTS_UNRESOLVED"}))

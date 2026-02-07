@@ -116,9 +116,37 @@ def _git_fetch_origin(ref):
     subprocess.run(["git", "fetch", "origin", ref], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
 
-def _git_numstat(base_ref):
-    # Prefer origin/<base>...HEAD; fallback to <base>...HEAD.
-    for lhs in (f"origin/{base_ref}...HEAD", f"{base_ref}...HEAD"):
+def _gh_default_branch(owner_repo):
+    if not owner_repo:
+        return ""
+    rc, out, _ = _run_capture(
+        [
+            "gh",
+            "repo",
+            "view",
+            "--repo",
+            owner_repo,
+            "--json",
+            "defaultBranchRef",
+            "--jq",
+            ".defaultBranchRef.name",
+        ]
+    )
+    if rc != 0:
+        return ""
+    return (out or "").strip()
+
+
+def _git_numstat(base_ref, base_oid):
+    # Prefer commit-oid diff when available; it's unambiguous for stacked PRs.
+    candidates = []
+    if base_oid:
+        candidates.append(f"{base_oid}...HEAD")
+    if base_ref:
+        candidates.append(f"origin/{base_ref}...HEAD")
+        candidates.append(f"{base_ref}...HEAD")
+
+    for lhs in candidates:
         rc, out, _ = _run_capture(["git", "diff", "--numstat", lhs])
         if rc == 0:
             return out
@@ -205,15 +233,22 @@ def main(argv):
         return 1
 
     head_oid = (pr.get("headRefOid") or "").strip()
-    base_ref = (pr.get("baseRefName") or "").strip() or "main"
+    base_oid = (pr.get("baseRefOid") or "").strip()
+    base_ref = (pr.get("baseRefName") or "").strip()
+    if not base_ref:
+        base_ref = _gh_default_branch(owner_repo)
+    if not base_ref and not base_oid:
+        _json_out({"error": "PR_BASE_REF_NOT_FOUND"})
+        return 1
     head_ref = (pr.get("headRefName") or "").strip()
     url = (pr.get("url") or "").strip()
 
     seed = f"{pr_number}:{round_num}:{head_oid}".encode("utf-8")
     run_id = hashlib.sha1(seed).hexdigest()[:12]
 
-    _git_fetch_origin(base_ref)
-    file_rows = _parse_numstat(_git_numstat(base_ref))
+    if base_ref:
+        _git_fetch_origin(base_ref)
+    file_rows = _parse_numstat(_git_numstat(base_ref, base_oid))
 
     labels = []
     for l in (pr.get("labels") or []):

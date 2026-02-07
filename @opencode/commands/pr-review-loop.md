@@ -6,6 +6,12 @@ agent: sisyphus
 
 # PR Review Loop
 
+## Stacked PR / PR -> PR（重要）
+
+- 本流程的 diff 基准来自 GitHub PR 元数据的 `baseRefName`（不是硬编码 main/master），因此天然支持“PR 合并到另一个 PR 分支”的 stacked PR。
+- 当 `baseRefName` 缺失时：会回退到仓库默认分支（`defaultBranchRef.name`）。
+- 当 base 分支 fetch 失败时：会直接报错终止（不再静默回退到 main/master），避免 review/changed-files 基准悄悄跑偏。
+
 ## 输入
 
 - `{{PR_NUMBER}}`
