@@ -1,7 +1,7 @@
 ---
 allowed-tools: [Bash, Read, Glob, TodoWrite, Edit, Grep, AskUserQuestion]
 description: 'Create release versions with intelligent changelog generation from release branch'
-agent: quick
+agent: documenter
 ---
 
 ## Usage

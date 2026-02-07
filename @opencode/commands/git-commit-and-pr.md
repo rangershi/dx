@@ -1,7 +1,7 @@
 ---
 allowed-tools: [Bash, Read, Glob, TodoWrite, Edit, Grep]
 description: 'Git 工作流：Issue/Commit/PR 自动化'
-agent: middle
+agent: documenter
 ---
 
 ## 用法

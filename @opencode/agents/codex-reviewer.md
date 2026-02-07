@@ -1,7 +1,7 @@
 ---
 description: review (Codex)
 mode: subagent
-model: openai/gpt-5.2-codex
+model: openai/gpt-5.3-codex
 temperature: 0.1
 tools:
   write: true
