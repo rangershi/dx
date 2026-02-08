@@ -15,7 +15,8 @@ describe('deployPrebuiltWithFallback()', () => {
       onMissingFiles: jest.fn(),
     })
 
-    expect(result).toEqual({ usedArchive: false })
+    expect(result.usedArchive).toBe(false)
+    expect(result.result).toEqual({ code: 0 })
     expect(run).toHaveBeenCalledTimes(1)
     expect(run).toHaveBeenCalledWith(baseArgs, { env: { TEST: '1' }, cwd: '/tmp' })
   })
@@ -42,7 +43,8 @@ describe('deployPrebuiltWithFallback()', () => {
       onMissingFiles,
     })
 
-    expect(result).toEqual({ usedArchive: true })
+    expect(result.usedArchive).toBe(true)
+    expect(result.result).toEqual({ code: 0 })
     expect(run).toHaveBeenCalledTimes(2)
     expect(onMissingFiles).toHaveBeenCalledTimes(1)
     expect(cleanupArchiveParts).toHaveBeenCalledTimes(1)
