@@ -18,6 +18,16 @@ tools:
 - PR 编号（如：`PR #123` 或 `prNumber: 123`）
 - round（如：`round: 1`；无则默认 1）
 
+## 唯一标识 runId（强制）
+
+- 脚本必须生成全局唯一标识 `runId`：`<PR>-<ROUND>-<HEAD_SHORT>`
+- 其中：
+  - `<PR>`：PR 编号
+  - `<ROUND>`：当前轮次
+  - `<HEAD_SHORT>`：`headOid` 的前 7 位（git rev-parse --short HEAD）
+- `runId` 必须包含在返回的 JSON 中，供后续步骤使用。
+
+
 ## 输出（强制）
 
 脚本会写入项目内 `./.cache/`，stdout 只输出单一 JSON（可 `JSON.parse()`）。
@@ -25,6 +35,8 @@ tools:
 ## Cache 约定（强制）
 
 - 缓存目录固定为 `./.cache/`；交接一律传 `./.cache/<file>`（repo 相对路径），禁止 basename-only（如 `foo.md`）。
+- 文件命名：`./.cache/pr-context-pr<PR>-r<ROUND>-<RUN_ID>.md`
+- `RUN_ID` 格式必须为 `<PR>-<ROUND>-<HEAD_SHORT>`
 
 ## 调用脚本（强制）
 

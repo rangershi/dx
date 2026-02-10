@@ -6,7 +6,6 @@
 # - Prints exactly one JSON object to stdout
 
 import argparse
-import hashlib
 import json
 import os
 import re
@@ -183,20 +182,28 @@ def main(argv):
     pr_number = int(args.pr)
     round_num = int(args.round)
 
+    def _json_err(error_code, extra=None):
+        obj = {"error": error_code, "prNumber": pr_number, "round": round_num}
+        if isinstance(extra, dict) and extra:
+            obj.update(extra)
+        _json_out(obj)
+
     # Preconditions: be in a git repo and gh is authenticated.
     rc, out, _ = _run_capture(["git", "rev-parse", "--is-inside-work-tree"])
     if rc != 0 or out.strip() != "true":
-        _json_out({"error": "NOT_A_GIT_REPO"})
+        _json_err("NOT_A_GIT_REPO")
         return 1
 
     host = _detect_git_remote_host() or "github.com"
     rc, gh_out, gh_err = _run_capture(["gh", "auth", "status", "--hostname", host])
     if rc == 127:
-        _json_out({
-            "error": "GH_CLI_NOT_FOUND",
-            "detail": "gh not found in PATH",
-            "suggestion": "Install GitHub CLI: https://cli.github.com/",
-        })
+        _json_err(
+            "GH_CLI_NOT_FOUND",
+            {
+                "detail": "gh not found in PATH",
+                "suggestion": "Install GitHub CLI: https://cli.github.com/",
+            },
+        )
         return 1
     if rc != 0:
         # If host detection is wrong, a global check might still succeed.
@@ -207,44 +214,51 @@ def main(argv):
             detail = (gh_err or gh_out or "").strip()
             if len(detail) > 4000:
                 detail = detail[-4000:]
-            _json_out({
-                "error": "GH_NOT_AUTHENTICATED",
-                "host": host,
-                "detail": detail,
-                "suggestion": f"Run: gh auth login --hostname {host}",
-            })
+            _json_err(
+                "GH_NOT_AUTHENTICATED",
+                {
+                    "host": host,
+                    "detail": detail,
+                    "suggestion": f"Run: gh auth login --hostname {host}",
+                },
+            )
             return 1
 
     rc, owner_repo, _ = _run_capture(["gh", "repo", "view", "--json", "nameWithOwner", "--jq", ".nameWithOwner"])
     owner_repo = owner_repo.strip() if rc == 0 else ""
     if not owner_repo:
-        _json_out({"error": "REPO_NOT_FOUND"})
+        _json_err("REPO_NOT_FOUND")
         return 1
 
     fields = "number,url,title,body,isDraft,labels,baseRefName,headRefName,baseRefOid,headRefOid,comments"
     rc, pr_json, _ = _run_capture(["gh", "pr", "view", str(pr_number), "--repo", owner_repo, "--json", fields])
     if rc != 0:
-        _json_out({"error": "PR_NOT_FOUND_OR_NO_ACCESS"})
+        _json_err("PR_NOT_FOUND_OR_NO_ACCESS")
         return 1
     try:
         pr = json.loads(pr_json)
     except Exception:
-        _json_out({"error": "PR_NOT_FOUND_OR_NO_ACCESS"})
+        _json_err("PR_NOT_FOUND_OR_NO_ACCESS")
         return 1
 
     head_oid = (pr.get("headRefOid") or "").strip()
     base_oid = (pr.get("baseRefOid") or "").strip()
     base_ref = (pr.get("baseRefName") or "").strip()
+
+    if not head_oid:
+        _json_err("PR_HEAD_OID_NOT_FOUND")
+        return 1
+
+    head_short = head_oid[:7]
     if not base_ref:
         base_ref = _gh_default_branch(owner_repo)
     if not base_ref and not base_oid:
-        _json_out({"error": "PR_BASE_REF_NOT_FOUND"})
+        _json_err("PR_BASE_REF_NOT_FOUND")
         return 1
     head_ref = (pr.get("headRefName") or "").strip()
     url = (pr.get("url") or "").strip()
 
-    seed = f"{pr_number}:{round_num}:{head_oid}".encode("utf-8")
-    run_id = hashlib.sha1(seed).hexdigest()[:12]
+    run_id = f"{pr_number}-{round_num}-{head_short}"
 
     if base_ref:
         _git_fetch_origin(base_ref)
@@ -277,6 +291,7 @@ def main(argv):
         fp.write(f"- RunId: {run_id}\n")
         fp.write(f"- Base: {base_ref}\n")
         fp.write(f"- Head: {head_ref}\n")
+        fp.write(f"- HeadShort: {head_short}\n")
         fp.write(f"- HeadOid: {head_oid}\n")
         fp.write(f"- Draft: {pr.get('isDraft')}\n")
         fp.write(f"- Labels: {', '.join(labels) if labels else '(none)'}\n")
@@ -317,6 +332,7 @@ def main(argv):
             "runId": run_id,
             "repo": {"nameWithOwner": owner_repo},
             "headOid": head_oid,
+            "headShort": head_short,
             "existingMarkerCount": marker_count,
             # Handoff should be repo-relative path so downstream agents can read it directly.
             "contextFile": _repo_relpath(REPO_ROOT, context_path),

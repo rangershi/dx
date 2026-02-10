@@ -19,7 +19,7 @@ tools:
 
 - `PR #<number>`
 - `round: <number>`
-- `runId: <string>`
+- `runId: <string>`（必须透传，格式 `<PR>-<ROUND>-<HEAD_SHORT>`，禁止自行生成）
 - `contextFile: <path>`（例如：`./.cache/pr-context-...md`）
 - `reviewFile: <path>`（多行，1+ 条；例如：`./.cache/review-...md`）
 
@@ -27,7 +27,7 @@ tools:
 
 - `PR #<number>`
 - `round: <number>`
-- `runId: <string>`
+- `runId: <string>`（必须透传，格式 `<PR>-<ROUND>-<HEAD_SHORT>`，禁止自行生成）
 - `fixReportFile: <path>`（例如：`./.cache/fix-report-...md`）
 
 示例：
@@ -35,11 +35,11 @@ tools:
 ```text
 PR #123
 round: 1
-runId: abcdef123456
-  contextFile: ./.cache/pr-context-pr123-r1-abcdef123456.md
-  reviewFile: ./.cache/review-CDX-pr123-r1-abcdef123456.md
-  reviewFile: ./.cache/review-CLD-pr123-r1-abcdef123456.md
-  reviewFile: ./.cache/review-GMN-pr123-r1-abcdef123456.md
+runId: 123-1-a1b2c3d
+  contextFile: ./.cache/pr-context-pr123-r1-123-1-a1b2c3d.md
+  reviewFile: ./.cache/review-CDX-pr123-r1-123-1-a1b2c3d.md
+  reviewFile: ./.cache/review-CLD-pr123-r1-123-1-a1b2c3d.md
+  reviewFile: ./.cache/review-GMN-pr123-r1-123-1-a1b2c3d.md
 ```
 
 ## 执行方式（强制）
@@ -65,11 +65,19 @@ runId: abcdef123456
 
 如果 decision-log（`./.cache/decision-log-pr<PR_NUMBER>.md`）存在，你需要基于 LLM 判断每个新 finding 与已决策问题的本质是否相同，从而生成 **escalation_groups** 参数。
 
+**匹配原则**：
+- **Essence 匹配**：对比 `essence` 字段与新 finding 的问题本质。
+- **文件强绑定**：仅当 decision-log 条目的 `file` 与新 finding 的 `file` **完全一致**时才进行匹配。
+  - 若文件被重命名/删除/拆分，视为不同问题（为了稳定性，不处理复杂的 rename 映射）。
+  - 若 decision-log 条目缺少 `file` 字段（旧数据），则跳过匹配（视为不相关）。
+
 **流程**：
 
-1. 读取 decision-log，提取已 rejected 问题的 `essence` 字段
-2. 逐个新 finding，与所有已 rejected 问题的 essence 做语义比对（使用 LLM）
-3. 判断是否"问题本质相同"（即便表述不同）
+1. 读取 decision-log，提取已 rejected 问题的 `essence` 和 `file` 字段
+2. 逐个新 finding，**先检查 file 是否匹配**
+   - 若 file 不匹配 → 视为 New Issue
+   - 若 file 匹配 → 继续对比 essence
+3. 若 essence 也匹配（"问题本质相同"）：
 4. 收集可升级的问题（重新质疑阈值）：
    - **升级阈值**：优先级差距 ≥ 2 级
    - 例如：已 rejected P3 but finding 为 P1 → 可升级质疑

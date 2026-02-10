@@ -8,21 +8,47 @@ Tests cover:
 3. Edge cases: empty input, malformed data, cross-reviewer matching
 """
 
-import pytest
-from unittest.mock import patch, MagicMock
-import sys
+import importlib.util
+import json
+import subprocess
+from collections.abc import Mapping, Sequence
 from pathlib import Path
+from types import SimpleNamespace
+from typing import Callable, cast
 
-# Add parent directory to path for importing pr_review_aggregate
-sys.path.insert(0, str(Path(__file__).parent))
+import pytest
 
-# Import functions under test
-from pr_review_aggregate import (
-    _parse_decision_log,
-    _filter_by_decision_log,
-    _parse_escalation_groups_json,
-    _parse_escalation_groups_b64,
+
+def _load_pr_review_aggregate_module():
+    module_path = Path(__file__).with_name("pr_review_aggregate.py")
+    spec = importlib.util.spec_from_file_location("pr_review_aggregate", module_path)
+    if spec is None or spec.loader is None:
+        raise RuntimeError(f"Failed to load module spec: {module_path}")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+_pr_review_aggregate = _load_pr_review_aggregate_module()
+
+_parse_decision_log = cast(Callable[[str], list[dict[str, object]]], getattr(_pr_review_aggregate, "_parse_decision_log"))
+_filter_by_decision_log = cast(
+    Callable[[Sequence[Mapping[str, object]], Sequence[Mapping[str, object]], list[list[str]]], list[dict[str, object]]],
+    getattr(_pr_review_aggregate, "_filter_by_decision_log"),
 )
+_parse_escalation_groups_json = cast(
+    Callable[[str], list[list[str]]],
+    getattr(_pr_review_aggregate, "_parse_escalation_groups_json"),
+)
+_parse_escalation_groups_b64 = cast(
+    Callable[[str], list[list[str]]],
+    getattr(_pr_review_aggregate, "_parse_escalation_groups_b64"),
+)
+_check_existing_comment = cast(
+    Callable[[int, str, int, str], bool],
+    getattr(_pr_review_aggregate, "_check_existing_comment"),
+)
+_MARKER = cast(str, getattr(_pr_review_aggregate, "MARKER"))
 
 
 # ============================================================
@@ -30,14 +56,49 @@ from pr_review_aggregate import (
 # ============================================================
 
 @pytest.fixture
-def empty_decision_log():
+def empty_decision_log() -> str:
     """Empty decision log markdown."""
     return ""
 
 
 @pytest.fixture
-def valid_decision_log():
+def valid_decision_log() -> str:
     """Valid decision log with Fixed and Rejected entries."""
+    return """# Decision Log
+
+PR: 123
+
+## Round 1
+
+### Fixed
+- id: CDX-001
+  file: apps/backend/src/api.ts
+  commit: abc123
+  essence: JSON.parse 未捕获异常
+
+- id: GMN-002
+  file: apps/front/src/ErrorBoundary.tsx
+  commit: def456
+  essence: 缺少错误边界处理
+
+### Rejected
+- id: GMN-004
+  file: apps/front/src/Component.tsx
+  priority: P2
+  reason: 需要产品决策，超出 PR 范围
+  essence: 组件拆分建议
+
+- id: CLD-003
+  file: apps/backend/src/db.ts
+  priority: P3
+  reason: 性能优化非当前优先级
+  essence: 批量查询优化
+"""
+
+
+@pytest.fixture
+def valid_decision_log_legacy_no_file() -> str:
+    """Legacy decision log fixture without the file: field (backward compat)."""
     return """# Decision Log
 
 PR: 123
@@ -67,7 +128,7 @@ PR: 123
 
 
 @pytest.fixture
-def malformed_decision_log():
+def malformed_decision_log() -> str:
     """Malformed decision log with missing fields and bad formatting."""
     return """# Decision Log
 
@@ -90,7 +151,7 @@ Some random text that should be ignored
 
 
 @pytest.fixture
-def sample_findings():
+def sample_findings() -> list[dict[str, object]]:
     """Sample findings list for filter tests."""
     return [
         {
@@ -137,7 +198,7 @@ def sample_findings():
 
 
 @pytest.fixture
-def prior_decisions():
+def prior_decisions() -> list[dict[str, object]]:
     """Sample prior decisions from _parse_decision_log."""
     return [
         {
@@ -160,7 +221,7 @@ def prior_decisions():
 # Test: _parse_decision_log() - Empty Input
 # ============================================================
 
-def test_parse_decision_log_empty(empty_decision_log):
+def test_parse_decision_log_empty(empty_decision_log: str) -> None:
     """
     Test that empty decision log returns empty list.
     
@@ -177,7 +238,7 @@ def test_parse_decision_log_empty(empty_decision_log):
 # Test: _parse_decision_log() - Valid Input
 # ============================================================
 
-def test_parse_decision_log_valid(valid_decision_log):
+def test_parse_decision_log_valid(valid_decision_log: str) -> None:
     """
     Test that valid decision log is parsed into structured data.
     
@@ -194,6 +255,7 @@ def test_parse_decision_log_valid(valid_decision_log):
     fixed_1 = result[0]
     assert fixed_1["id"] == "CDX-001"
     assert fixed_1["status"] == "fixed"
+    assert fixed_1["file"] == "apps/backend/src/api.ts"
     assert fixed_1["commit"] == "abc123"
     assert fixed_1["essence"] == "JSON.parse 未捕获异常"
     
@@ -201,6 +263,7 @@ def test_parse_decision_log_valid(valid_decision_log):
     fixed_2 = result[1]
     assert fixed_2["id"] == "GMN-002"
     assert fixed_2["status"] == "fixed"
+    assert fixed_2["file"] == "apps/front/src/ErrorBoundary.tsx"
     assert fixed_2["commit"] == "def456"
     assert fixed_2["essence"] == "缺少错误边界处理"
     
@@ -208,6 +271,7 @@ def test_parse_decision_log_valid(valid_decision_log):
     rejected_1 = result[2]
     assert rejected_1["id"] == "GMN-004"
     assert rejected_1["status"] == "rejected"
+    assert rejected_1["file"] == "apps/front/src/Component.tsx"
     assert rejected_1["priority"] == "P2"
     assert rejected_1["reason"] == "需要产品决策，超出 PR 范围"
     assert rejected_1["essence"] == "组件拆分建议"
@@ -216,14 +280,31 @@ def test_parse_decision_log_valid(valid_decision_log):
     rejected_2 = result[3]
     assert rejected_2["id"] == "CLD-003"
     assert rejected_2["status"] == "rejected"
+    assert rejected_2["file"] == "apps/backend/src/db.ts"
     assert rejected_2["priority"] == "P3"
+
+
+def test_parse_decision_log_legacy_without_file(valid_decision_log_legacy_no_file: str) -> None:
+    """Decision log entries without file: should still parse (backward compat)."""
+    result = _parse_decision_log(valid_decision_log_legacy_no_file)
+
+    # Should have 4 entries (2 Fixed, 2 Rejected)
+    assert len(result) == 4
+
+    # Basic shape should still be present
+    for entry in result:
+        assert "id" in entry
+        assert "status" in entry
+
+    # And file should be optional
+    assert all(("file" not in e) or (e["file"] in (None, "")) for e in result)
 
 
 # ============================================================
 # Test: _parse_decision_log() - Malformed Input
 # ============================================================
 
-def test_parse_decision_log_malformed(malformed_decision_log):
+def test_parse_decision_log_malformed(malformed_decision_log: str) -> None:
     """
     Test that malformed decision log degrades gracefully.
     
@@ -247,7 +328,7 @@ def test_parse_decision_log_malformed(malformed_decision_log):
 # Test: _filter_by_decision_log() - Fixed Issues
 # ============================================================
 
-def test_filter_fixed_issues(sample_findings, prior_decisions):
+def test_filter_fixed_issues(sample_findings: list[dict[str, object]], prior_decisions: list[dict[str, object]]) -> None:
     """
     Test that findings matching Fixed decisions are filtered out.
     
@@ -255,7 +336,7 @@ def test_filter_fixed_issues(sample_findings, prior_decisions):
     When: _filter_by_decision_log() is called with empty escalation_groups
     Then: CDX-001 is filtered out
     """
-    escalation_groups = []
+    escalation_groups: list[list[str]] = []
     
     result = _filter_by_decision_log(sample_findings, prior_decisions, escalation_groups)
     
@@ -271,7 +352,7 @@ def test_filter_fixed_issues(sample_findings, prior_decisions):
 # Test: _filter_by_decision_log() - Rejected Without Escalation
 # ============================================================
 
-def test_filter_rejected_without_escalation(sample_findings, prior_decisions):
+def test_filter_rejected_without_escalation(sample_findings: list[dict[str, object]], prior_decisions: list[dict[str, object]]) -> None:
     """
     Test that findings matching Rejected decisions are filtered out when NOT in escalation_groups.
     
@@ -280,7 +361,7 @@ def test_filter_rejected_without_escalation(sample_findings, prior_decisions):
     When: _filter_by_decision_log() is called
     Then: GMN-004 is filtered out
     """
-    escalation_groups = []
+    escalation_groups: list[list[str]] = []
     
     result = _filter_by_decision_log(sample_findings, prior_decisions, escalation_groups)
     
@@ -296,7 +377,7 @@ def test_filter_rejected_without_escalation(sample_findings, prior_decisions):
 # Test: _filter_by_decision_log() - Rejected With Escalation
 # ============================================================
 
-def test_filter_rejected_with_escalation(sample_findings, prior_decisions):
+def test_filter_rejected_with_escalation(sample_findings: list[dict[str, object]], prior_decisions: list[dict[str, object]]) -> None:
     """
     Test that findings matching Rejected decisions are kept when in escalation_groups.
     
@@ -322,7 +403,7 @@ def test_filter_rejected_with_escalation(sample_findings, prior_decisions):
 # Test: _filter_by_decision_log() - Cross-Reviewer Match
 # ============================================================
 
-def test_filter_cross_reviewer_match():
+def test_filter_cross_reviewer_match() -> None:
     """
     Test that findings with different reviewer IDs but same essence are filtered.
     
@@ -381,7 +462,7 @@ def test_filter_cross_reviewer_match():
 # Test: _parse_escalation_groups_json()
 # ============================================================
 
-def test_parse_escalation_groups_json_valid():
+def test_parse_escalation_groups_json_valid() -> None:
     """Test parsing valid escalation groups JSON."""
     json_str = '{"escalationGroups": [["GMN-004", "CLD-007"], ["CDX-001", "GMN-005"]]}'
     result = _parse_escalation_groups_json(json_str)
@@ -391,13 +472,13 @@ def test_parse_escalation_groups_json_valid():
     assert ["CDX-001", "GMN-005"] in result
 
 
-def test_parse_escalation_groups_json_empty():
+def test_parse_escalation_groups_json_empty() -> None:
     """Test parsing empty escalation groups JSON."""
     result = _parse_escalation_groups_json("")
     assert result == []
 
 
-def test_parse_escalation_groups_json_malformed():
+def test_parse_escalation_groups_json_malformed() -> None:
     """Test parsing malformed JSON returns empty list."""
     result = _parse_escalation_groups_json("not valid json {{{")
     assert result == []
@@ -407,7 +488,7 @@ def test_parse_escalation_groups_json_malformed():
 # Test: _parse_escalation_groups_b64()
 # ============================================================
 
-def test_parse_escalation_groups_b64_valid():
+def test_parse_escalation_groups_b64_valid() -> None:
     """Test parsing valid base64-encoded escalation groups."""
     import base64
     json_str = '{"escalationGroups": [["GMN-004", "CLD-007"]]}'
@@ -419,13 +500,13 @@ def test_parse_escalation_groups_b64_valid():
     assert ["GMN-004", "CLD-007"] in result
 
 
-def test_parse_escalation_groups_b64_empty():
+def test_parse_escalation_groups_b64_empty() -> None:
     """Test parsing empty base64 string."""
     result = _parse_escalation_groups_b64("")
     assert result == []
 
 
-def test_parse_escalation_groups_b64_invalid():
+def test_parse_escalation_groups_b64_invalid() -> None:
     """Test parsing invalid base64 returns empty list."""
     result = _parse_escalation_groups_b64("not-valid-base64!!!")
     assert result == []
@@ -435,7 +516,7 @@ def test_parse_escalation_groups_b64_invalid():
 # Test: Integration - Full Workflow
 # ============================================================
 
-def test_integration_full_filter_workflow():
+def test_integration_full_filter_workflow() -> None:
     """
     Integration test: parse decision log and filter findings.
     
@@ -496,5 +577,125 @@ PR: 456
     assert len(result) == 2
 
 
+# ============================================================
+# Test: _check_existing_comment() - PR comment idempotency
+# ============================================================
+
+
+def _patch_subprocess_run_for_gh_comments(monkeypatch: pytest.MonkeyPatch, comments: list[dict[str, object]], returncode: int = 0) -> None:
+    stdout = json.dumps(comments, ensure_ascii=True)
+
+    def _fake_run(*_args: object, **_kwargs: object) -> SimpleNamespace:
+        return SimpleNamespace(returncode=returncode, stdout=stdout)
+
+    monkeypatch.setattr(subprocess, "run", _fake_run)
+
+
+@pytest.mark.parametrize(
+    "comment_type,round_num,expected_header",
+    [
+        ("review-summary", 2, "## Review Summary (Round 2)"),
+        ("fix-report", 2, "## Fix Report (Round 2)"),
+        ("final-report", 2, "## Final Report"),
+    ],
+)
+def test_check_existing_comment_true_when_marker_header_and_runid_match(
+    monkeypatch: pytest.MonkeyPatch, comment_type: str, round_num: int, expected_header: str
+) -> None:
+    pr_number = 123
+    run_id = "run-abc"
+    body = "\n".join([_MARKER, "", expected_header, "", f"RunId: {run_id}"])
+    _patch_subprocess_run_for_gh_comments(monkeypatch, [{"body": body}])
+
+    assert _check_existing_comment(pr_number, run_id, round_num, comment_type) is True
+
+
+@pytest.mark.parametrize(
+    "comment_type,round_num,expected_header",
+    [
+        ("review-summary", 3, "## Review Summary (Round 3)"),
+        ("fix-report", 3, "## Fix Report (Round 3)"),
+        ("final-report", 3, "## Final Report"),
+    ],
+)
+def test_check_existing_comment_false_when_marker_missing(
+    monkeypatch: pytest.MonkeyPatch, comment_type: str, round_num: int, expected_header: str
+) -> None:
+    pr_number = 456
+    run_id = "run-xyz"
+    body = "\n".join(["", expected_header, "", f"RunId: {run_id}"])
+    _patch_subprocess_run_for_gh_comments(monkeypatch, [{"body": body}])
+
+    assert _check_existing_comment(pr_number, run_id, round_num, comment_type) is False
+
+
+@pytest.mark.parametrize(
+    "comment_type,round_num,expected_header,wrong_header",
+    [
+        (
+            "review-summary",
+            2,
+            "## Review Summary (Round 2)",
+            "## Fix Report (Round 2)",
+        ),
+        (
+            "fix-report",
+            2,
+            "## Fix Report (Round 2)",
+            "## Review Summary (Round 2)",
+        ),
+        (
+            "final-report",
+            2,
+            "## Final Report",
+            "## Review Summary (Round 2)",
+        ),
+    ],
+)
+def test_check_existing_comment_false_when_header_mismatched(
+    monkeypatch: pytest.MonkeyPatch, comment_type: str, round_num: int, expected_header: str, wrong_header: str
+) -> None:
+    pr_number = 789
+    run_id = "run-123"
+
+    body = "\n".join([_MARKER, "", wrong_header, "", f"RunId: {run_id}"])
+    _patch_subprocess_run_for_gh_comments(monkeypatch, [{"body": body}])
+
+    assert expected_header not in body
+    assert _check_existing_comment(pr_number, run_id, round_num, comment_type) is False
+
+
+@pytest.mark.parametrize(
+    "comment_type,round_num,expected_header",
+    [
+        ("review-summary", 1, "## Review Summary (Round 1)"),
+        ("fix-report", 1, "## Fix Report (Round 1)"),
+        ("final-report", 1, "## Final Report"),
+    ],
+)
+def test_check_existing_comment_false_when_runid_mismatched(
+    monkeypatch: pytest.MonkeyPatch, comment_type: str, round_num: int, expected_header: str
+) -> None:
+    pr_number = 101
+    run_id = "run-a"
+    other_run_id = "run-b"
+
+    body = "\n".join([_MARKER, "", expected_header, "", f"RunId: {other_run_id}"])
+    _patch_subprocess_run_for_gh_comments(monkeypatch, [{"body": body}])
+
+    assert _check_existing_comment(pr_number, run_id, round_num, comment_type) is False
+
+
+def test_check_existing_comment_false_when_subprocess_run_nonzero(monkeypatch: pytest.MonkeyPatch) -> None:
+    pr_number = 999
+    run_id = "run-nonzero"
+    round_num = 2
+    comment_type = "review-summary"
+    body = "\n".join([_MARKER, "", "## Review Summary (Round 2)", "", f"RunId: {run_id}"])
+
+    _patch_subprocess_run_for_gh_comments(monkeypatch, [{"body": body}], returncode=1)
+    assert _check_existing_comment(pr_number, run_id, round_num, comment_type) is False
+
+
 if __name__ == "__main__":
-    pytest.main([__file__, "-v"])
+    _ = pytest.main([__file__, "-v"])

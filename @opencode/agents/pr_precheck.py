@@ -15,19 +15,70 @@
 # Stdout contract: print exactly one JSON object and nothing else.
 
 import json
-import os
 import re
-import secrets
 import subprocess
 import sys
 from urllib.parse import urlparse
 from pathlib import Path
 
 
+_last_pr_number = None
+_last_round = None
+
+
+def emit_json(obj):
+    # Stdout contract: exactly one JSON line.
+    _ = sys.stdout.write(json.dumps(obj, separators=(",", ":"), ensure_ascii=True) + "\n")
+
+
+def parse_args(argv):
+    pr = None
+    round_n = 1
+
+    positional = []
+    i = 1
+    while i < len(argv):
+        a = argv[i]
+        if a == "--pr":
+            i += 1
+            if i >= len(argv):
+                return None, None, "PR_NUMBER_NOT_PROVIDED"
+            pr = argv[i]
+        elif a.startswith("--pr="):
+            pr = a.split("=", 1)[1]
+        elif a == "--round":
+            i += 1
+            if i >= len(argv):
+                return None, None, "ROUND_INVALID"
+            round_n = argv[i]
+        elif a.startswith("--round="):
+            round_n = a.split("=", 1)[1]
+        elif a.startswith("-"):
+            return None, None, "INVALID_ARGS"
+        else:
+            positional.append(a)
+        i += 1
+
+    if pr is None and positional:
+        pr = positional[0]
+
+    pr = (pr or "").strip()
+    if not pr.isdigit():
+        return None, None, "PR_NUMBER_NOT_PROVIDED"
+
+    try:
+        round_int = int(str(round_n).strip())
+    except Exception:
+        return int(pr), None, "ROUND_INVALID"
+    if round_int < 1:
+        return int(pr), None, "ROUND_INVALID"
+
+    return int(pr), round_int, None
+
 def run(cmd, *, cwd=None, stdout_path=None, stderr_path=None):
     try:
         return _run(cmd, cwd=cwd, stdout_path=stdout_path, stderr_path=stderr_path)
-    except FileNotFoundError as e:
+    except FileNotFoundError:
         # Match common shell semantics for "command not found".
         return 127
 
@@ -156,96 +207,197 @@ def write_fixfile(path, issues):
         sugg = it["suggestion"].replace("\n", "\\n")
         out.append(f"  description: {desc}")
         out.append(f"  suggestion: {sugg}")
-    p.write_text("\n".join(out) + "\n")
+    _ = p.write_text("\n".join(out) + "\n")
 
 
 def main():
-    if len(sys.argv) < 2:
-        print(json.dumps({"error": "PR_NUMBER_NOT_PROVIDED"}))
+    global _last_pr_number
+    global _last_round
+
+    pr_number, round_n, arg_err = parse_args(sys.argv)
+    if arg_err:
+        err_obj: dict[str, object] = {"error": arg_err}
+        if pr_number is not None:
+            err_obj["prNumber"] = pr_number
+        if round_n is not None:
+            err_obj["round"] = round_n
+        emit_json(err_obj)
         return 1
 
-    pr = sys.argv[1].strip()
-    if not pr.isdigit():
-        print(json.dumps({"error": "PR_NUMBER_NOT_PROVIDED"}))
-        return 1
+    _last_pr_number = pr_number
+    _last_round = round_n
 
-    rc, out, _ = run_capture(["git", "rev-parse", "--is-inside-work-tree"])
-    if rc != 0 or out.strip() != "true":
-        print(json.dumps({"error": "NOT_A_GIT_REPO"}))
+    pr = str(pr_number)
+    base_payload: dict[str, object] = {
+        "prNumber": pr_number,
+        "round": round_n,
+    }
+
+    rc, git_out, _ = run_capture(["git", "rev-parse", "--is-inside-work-tree"])
+    if rc != 0 or git_out.strip() != "true":
+        emit_json({
+            **base_payload,
+            "error": "NOT_A_GIT_REPO",
+        })
         return 1
 
     host = _detect_git_remote_host() or "github.com"
+
+    auth_host_used = None
     rc, gh_out, gh_err = run_capture(["gh", "auth", "status", "--hostname", host])
     if rc == 127:
-        print(json.dumps({
+        emit_json({
+            **base_payload,
             "error": "GH_CLI_NOT_FOUND",
             "detail": "gh not found in PATH",
             "suggestion": "Install GitHub CLI: https://cli.github.com/",
-        }))
+        })
         return 1
+
+    if rc == 0:
+        auth_host_used = host
+    else:
+        # If hostname auth fails (e.g. SSH host alias), fall back to default host.
+        rc_default, gh_out_default, gh_err_default = run_capture(["gh", "auth", "status"])
+        if rc_default == 0:
+            # Proceed using default gh auth context; avoid false GH_NOT_AUTHENTICATED.
+            auth_host_used = "default"
+            rc, gh_out, gh_err = rc_default, gh_out_default, gh_err_default
+
     if rc != 0:
         detail = (gh_err or gh_out or "").strip()
         if len(detail) > 4000:
             detail = detail[-4000:]
-        print(json.dumps({
+        emit_json({
+            **base_payload,
             "error": "GH_NOT_AUTHENTICATED",
             "host": host,
             "detail": detail,
             "suggestion": f"Run: gh auth login --hostname {host}",
-        }))
+        })
         return 1
 
-    rc, pr_json, _ = run_capture(["gh", "pr", "view", pr, "--json", "headRefName,baseRefName,mergeable"])
+    if auth_host_used == "default":
+        base_payload["authHostUsed"] = auth_host_used
+
+    rc, pr_json, _ = run_capture([
+        "gh",
+        "pr",
+        "view",
+        pr,
+        "--json",
+        "headRefName,baseRefName,mergeable,headRefOid",
+    ])
     if rc != 0:
-        print(json.dumps({"error": "PR_NOT_FOUND_OR_NO_ACCESS"}))
+        emit_json({
+            **base_payload,
+            "error": "PR_NOT_FOUND_OR_NO_ACCESS",
+        })
         return 1
     try:
         pr_info = json.loads(pr_json)
     except Exception:
-        print(json.dumps({"error": "PR_NOT_FOUND_OR_NO_ACCESS"}))
+        emit_json({
+            **base_payload,
+            "error": "PR_NOT_FOUND_OR_NO_ACCESS",
+        })
         return 1
 
     head = (pr_info.get("headRefName") or "").strip()
     base = (pr_info.get("baseRefName") or "").strip()
     mergeable = (pr_info.get("mergeable") or "").strip()
 
+    head_oid = (pr_info.get("headRefOid") or "").strip()
+    if not head_oid:
+        emit_json({
+            **base_payload,
+            "error": "PR_HEAD_OID_NOT_FOUND",
+            "headRefName": head,
+            "baseRefName": base,
+            "mergeable": mergeable,
+        })
+        return 1
+
+    head_short = head_oid[:7]
+    run_id = f"{pr_number}-{round_n}-{head_short}"
+
+    payload: dict[str, object] = {
+        **base_payload,
+        "runId": run_id,
+        "headOid": head_oid,
+        "headShort": head_short,
+        "headRefName": head,
+        "baseRefName": base,
+        "mergeable": mergeable,
+    }
+
     rc, cur_branch, _ = run_capture(["git", "rev-parse", "--abbrev-ref", "HEAD"])
     if rc != 0:
-        print(json.dumps({"error": "PR_CHECKOUT_FAILED"}))
+        emit_json({
+            **payload,
+            "error": "PR_CHECKOUT_FAILED",
+        })
         return 1
     if head and cur_branch.strip() != head:
         if run(["gh", "pr", "checkout", pr]) != 0:
-            print(json.dumps({"error": "PR_CHECKOUT_FAILED"}))
+            emit_json({
+                **payload,
+                "error": "PR_CHECKOUT_FAILED",
+            })
             return 1
 
     if not base:
-        rc, out, _ = run_capture(["gh", "repo", "view", "--json", "defaultBranchRef", "--jq", ".defaultBranchRef.name"])
+        rc, default_branch_out, _ = run_capture([
+            "gh",
+            "repo",
+            "view",
+            "--json",
+            "defaultBranchRef",
+            "--jq",
+            ".defaultBranchRef.name",
+        ])
         if rc == 0:
-            base = out.strip()
+            base = default_branch_out.strip()
     if not base:
-        print(json.dumps({"error": "PR_BASE_REF_NOT_FOUND"}))
+        emit_json({
+            **payload,
+            "error": "PR_BASE_REF_NOT_FOUND",
+        })
         return 1
 
+    # baseRefName can be resolved from default branch; keep payload in sync.
+    payload["baseRefName"] = base
+
     if run(["git", "fetch", "origin", base]) != 0:
-        print(json.dumps({"error": "PR_BASE_REF_FETCH_FAILED", "baseRefName": base}))
+        emit_json({
+            **payload,
+            "error": "PR_BASE_REF_FETCH_FAILED",
+            "baseRefName": base,
+        })
         return 1
 
     if mergeable == "CONFLICTING":
-        print(json.dumps({"error": "PR_MERGE_CONFLICTS_UNRESOLVED"}))
+        emit_json({
+            **payload,
+            "error": "PR_MERGE_CONFLICTS_UNRESOLVED",
+        })
         return 1
 
-    run_id = secrets.token_hex(4)
     root = repo_root()
     cache = cache_dir(root)
     cache.mkdir(parents=True, exist_ok=True)
     
-    cache_clear_log = cache / f"precheck-pr{pr}-{run_id}-cache-clear.log"
-    lint_log = cache / f"precheck-pr{pr}-{run_id}-lint.log"
-    build_log = cache / f"precheck-pr{pr}-{run_id}-build.log"
-    meta_log = cache / f"precheck-pr{pr}-{run_id}-meta.json"
+    cache_clear_log = cache / f"precheck-{run_id}-cache-clear.log"
+    lint_log = cache / f"precheck-{run_id}-lint.log"
+    build_log = cache / f"precheck-{run_id}-build.log"
+    meta_log = cache / f"precheck-{run_id}-meta.json"
 
-    meta_log.write_text(json.dumps({
-        "pr": int(pr),
+    _ = meta_log.write_text(json.dumps({
+        "prNumber": pr_number,
+        "round": round_n,
+        "runId": run_id,
+        "headOid": head_oid,
+        "headShort": head_short,
         "headRefName": head,
         "baseRefName": base,
         "mergeable": mergeable,
@@ -256,7 +408,7 @@ def main():
 
     cache_rc = run(["dx", "cache", "clear"], stdout_path=str(cache_clear_log), stderr_path=str(cache_clear_log))
     if cache_rc != 0:
-        fix_file = f"precheck-fix-pr{pr}-{run_id}.md"
+        fix_file = f"precheck-fix-{run_id}.md"
         fix_path = cache / fix_file
         log_tail = tail_text(cache_clear_log)
         issues = [{
@@ -270,7 +422,11 @@ def main():
             "suggestion": f"Open log: {repo_relpath(root, cache_clear_log)}",
         }]
         write_fixfile(str(fix_path), issues)
-        print(json.dumps({"ok": False, "fixFile": repo_relpath(root, fix_path)}))
+        emit_json({
+            **payload,
+            "ok": False,
+            "fixFile": repo_relpath(root, fix_path),
+        })
         return 1
 
     import threading
@@ -288,10 +444,13 @@ def main():
     t2.join()
 
     if results.get("lint", 1) == 0 and results.get("build", 1) == 0:
-        print(json.dumps({"ok": True}))
+        emit_json({
+            **payload,
+            "ok": True,
+        })
         return 0
 
-    fix_file = f"precheck-fix-pr{pr}-{run_id}.md"
+    fix_file = f"precheck-fix-{run_id}.md"
     fix_path = cache / fix_file
 
     issues = []
@@ -325,13 +484,22 @@ def main():
         })
 
     write_fixfile(str(fix_path), issues)
-    print(json.dumps({"ok": False, "fixFile": repo_relpath(root, fix_path)}))
+    emit_json({
+        **payload,
+        "ok": False,
+        "fixFile": repo_relpath(root, fix_path),
+    })
     return 1
 
 
 if __name__ == "__main__":
     try:
         sys.exit(main())
-    except Exception as e:
-        print(json.dumps({"error": "PRECHECK_SCRIPT_FAILED"}))
+    except Exception:
+        err_obj: dict[str, object] = {"error": "PRECHECK_SCRIPT_FAILED"}
+        if _last_pr_number is not None:
+            err_obj["prNumber"] = _last_pr_number
+        if _last_round is not None:
+            err_obj["round"] = _last_round
+        emit_json(err_obj)
         sys.exit(1)

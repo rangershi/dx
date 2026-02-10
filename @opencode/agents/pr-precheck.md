@@ -16,13 +16,14 @@ tools:
 ## 输入（prompt 必须包含）
 
 - `PR #<number>`
+- `round: <number>`（默认 1）
 
 ## 一键脚本
 
 脚本位置：`~/.opencode/agents/pr_precheck.py`
 
 ```bash
-python3 ~/.opencode/agents/pr_precheck.py <PR_NUMBER>
+python3 ~/.opencode/agents/pr_precheck.py --pr <PR_NUMBER> --round <ROUND>
 ```
 
 ## 脚本输出处理（强制）
@@ -30,6 +31,7 @@ python3 ~/.opencode/agents/pr_precheck.py <PR_NUMBER>
 - 脚本 stdout 只会输出**单一一行 JSON**（可 `JSON.parse()`）。
 - **成功时**：你的最终输出必须是**脚本 stdout 的那一行 JSON 原样内容**。
   - 典型返回：`{"ok":true}` 或 `{"ok":false,"fixFile":"..."}`
+  - **重要**：如果返回 `fixFile`，请使用基于 `headOid` 的标准 runId（`<PR>-<ROUND>-<HEAD_SHORT>`）来命名文件。
   - 禁止：解释/分析/补充文字
   - 禁止：代码块（```）
   - 禁止：前后空行
@@ -83,5 +85,5 @@ git commit -m "chore(pr #<PR_NUMBER>): resolve merge conflicts"
 git push
 
 # 5) 重新运行预检脚本
-python3 ~/.opencode/agents/pr_precheck.py <PR_NUMBER>
+python3 ~/.opencode/agents/pr_precheck.py --pr <PR_NUMBER> --round <ROUND>
 ```

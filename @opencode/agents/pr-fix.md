@@ -32,7 +32,7 @@ tools:
 ### 必需输入
 
 - **PR 编号**：调用者必须在 prompt 中明确提供（如：`请修复 PR #123`）
-- **runId**：调用者必须在 prompt 中提供（必须透传，禁止自行生成）
+- **runId**：调用者必须在 prompt 中提供（必须透传，格式 `<PR>-<ROUND>-<HEAD_SHORT>`，禁止自行生成）
 - **fixFile**：调用者必须在 prompt 中提供问题清单文件路径（repo 相对路径，例：`./.cache/fix-...md`）（Structured Handoff）
 
 ### 失败快速退出
@@ -154,12 +154,14 @@ PR: <PR_NUMBER>
 ### Fixed
 
 - id: <FINDING_ID>
+  file: <FILE_PATH>
   commit: <SHA>
   essence: <问题本质的一句话描述>
 
 ### Rejected
 
 - id: <FINDING_ID>
+  file: <FILE_PATH>
   priority: <P0|P1|P2|P3>
   reason: <拒绝原因>
   essence: <问题本质的一句话描述>
@@ -170,6 +172,8 @@ PR: <PR_NUMBER>
 - 如果文件不存在：创建新文件，包含 `# Decision Log` 头、`PR: <PR_NUMBER>` 字段，以及第一个 `## Round <ROUND>` 段落
 - 如果文件存在：追加新的 `## Round <ROUND>` 段落到文件末尾
 - **禁止删除或覆盖历史轮次的记录**
+- **file 字段**：必须记录问题所在的文件路径（repo 相对路径）。
+  - 对于 `pr-precheck` 产生的修复，`file` 字段可填 `__precheck__`。
 
 ### essence 字段要求
 
@@ -178,6 +182,7 @@ essence 是问题本质的一句话描述，用于后续轮次的智能匹配和
 - 简洁性：≤ 50 字
 - 问题导向：描述问题核心（而非具体代码位置、文件行号）
 - 可匹配性：后续轮次的 reviewer 能通过关键词匹配识别该问题
+- **文件强绑定**：必须假设问题与当前文件强绑定（若文件重命名，视为不同问题）
 
 **示例对比：**
 

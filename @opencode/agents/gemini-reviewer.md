@@ -14,7 +14,7 @@ tools:
 
 - `PR #<number>`
 - `round: <number>`
-- `runId: <string>`（必须透传，禁止自行生成）
+- `runId: <string>`（必须透传，格式 `<PR>-<ROUND>-<HEAD_SHORT>`，禁止自行生成）
 - `contextFile: <filename>`
 
 ## 输出（强制）
@@ -40,7 +40,11 @@ tools:
    - 若你的发现 priority 比原问题高 ≥2 级（如 P3→P1, P2→P0），可以升级质疑
    - 否则不再提出
 
-判断"问题本质相同"时，比对 decision-log 中的 `essence` 字段与你发现的问题描述。
+4. **文件一致性**：
+   - 匹配 Decision Log 时，**必须检查 `file` 字段是否与当前 finding 的文件一致**。
+   - 若 decision-log 中的 `file` 与当前文件不一致（包括重命名、移动、删除），则**视为不同问题**，不进行 essence 匹配（即作为新问题处理）。
+   - 若 decision-log 条目缺少 `file` 字段，也视为不匹配。
+
 
 ### 禁止事项
 - ⛔ 不质疑已修复问题的实现方式（除非发现修复引入了新 bug）
