@@ -10,13 +10,13 @@
   ],
   "agent": {
     "quick": {
-      "model": "openai/gpt-5.1-codex-mini"
+      "model": "openai/gpt-5.3-codex-spark"
     },
     "middle": {
-      "model": "github-copilot/claude-sonnet-4.5"
+      "model": "openai/gpt-5.3-codex"
     },
     "documenter": {
-      "model": "github-copilot/claude-sonnet-4.5"
+      "model": "openai/gpt-5.3-codex-spark"
     }
   },
   "permission": {
