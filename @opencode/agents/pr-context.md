@@ -1,7 +1,7 @@
 ---
 description: build PR context file
 mode: subagent
-model: github-copilot/claude-sonnet-4.5
+model: openai/gpt-5.3-codex-spark
 temperature: 0.1
 tools:
   bash: true

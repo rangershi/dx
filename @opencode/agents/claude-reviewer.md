@@ -1,7 +1,7 @@
 ---
 description: review (Claude)
 mode: subagent
-model: github-copilot/claude-sonnet-4.5
+model: cliproxy/gemini-claude-sonnet-4-5
 tools:
   write: true
   edit: false

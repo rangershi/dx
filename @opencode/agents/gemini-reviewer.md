@@ -1,7 +1,7 @@
 ---
 description: review (Gemini)
 mode: subagent
-model: github-copilot/gemini-3-pro-preview
+model: cliproxy/gemini-3-pro-preview
 tools:
   write: true
   edit: false

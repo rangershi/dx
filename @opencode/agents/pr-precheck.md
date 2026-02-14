@@ -1,7 +1,7 @@
 ---
 description: PR precheck (checkout + lint + build)
 mode: subagent
-model: openai/gpt-5.3-codex
+model: openai/gpt-5.3-codex-spark
 temperature: 0.1
 tools:
   bash: true
