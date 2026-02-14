@@ -1,7 +1,7 @@
 ---
 description: review (Claude)
 mode: subagent
-model: cliproxy/gemini-claude-sonnet-4-5
+model: openai/gpt-5.2
 tools:
   write: true
   edit: false

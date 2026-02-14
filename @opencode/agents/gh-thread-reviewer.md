@@ -1,7 +1,7 @@
 ---
 description: review (GitHub Harvest)
 mode: subagent
-model: openai/gpt-5.2
+model: openai/gpt-5.3-codex-spark
 temperature: 0.2
 tools:
   write: true

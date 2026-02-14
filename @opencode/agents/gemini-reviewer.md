@@ -1,7 +1,7 @@
 ---
 description: review (Gemini)
 mode: subagent
-model: cliproxy/gemini-3-pro-preview
+model: openai/gpt-5.1-codex
 tools:
   write: true
   edit: false
