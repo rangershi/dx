@@ -2,7 +2,13 @@ import { describe, test, expect, beforeEach, afterEach, jest } from '@jest/globa
 import { mkdtempSync, writeFileSync, rmSync, mkdirSync, existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
-import { deployToVercel, resolveTargetRunCwd } from '../lib/vercel-deploy.js'
+import {
+  deployToVercel,
+  isSupportedDeployMode,
+  resolveTargetDeployMode,
+  resolveTargetPrebuiltCwd,
+  resolveTargetRunCwd,
+} from '../lib/vercel-deploy.js'
 import { logger } from '../lib/logger.js'
 
 describe('deployToVercel()', () => {
@@ -65,7 +71,7 @@ describe('deployToVercel()', () => {
     expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('缺少以下 Vercel 环境变量'))
   })
 
-  test('front uses target deploy cwd while keeping absolute local-config', async () => {
+  test('front uses prebuilt deploy mode with separate prebuiltCwd', async () => {
     const cwd = process.cwd()
     const frontCwd = join(cwd, 'apps/front')
     writeFileSync(join(cwd, 'vercel.front.json'), '{}')
@@ -106,10 +112,55 @@ describe('deployToVercel()', () => {
     ])
 
     expect(run.mock.calls[0][1].cwd).toBe(frontCwd)
-    expect(run.mock.calls[1][1].cwd).toBe(frontCwd)
+    expect(run.mock.calls[1][1].cwd).toBe(cwd)
+    expect(logger.info).toHaveBeenCalledWith(expect.stringContaining('[deploy-context]'))
+    expect(logger.info).toHaveBeenCalledWith(expect.stringContaining('mode=prebuilt'))
+    expect(logger.info).toHaveBeenCalledWith(expect.stringContaining(`runCwd=${frontCwd}`))
+    expect(logger.info).toHaveBeenCalledWith(expect.stringContaining(`prebuiltCwd=${cwd}`))
   })
 
-  test('deploy all uses front/admin target-specific cwd', async () => {
+  test('admin keeps prebuilt deploy mode', async () => {
+    const cwd = process.cwd()
+    const adminCwd = join(cwd, 'apps/admin-front')
+    writeFileSync(join(cwd, 'vercel.admin.json'), '{}')
+
+    const run = jest.fn().mockResolvedValue({ code: 0, stdout: '', stderr: '' })
+
+    await deployToVercel('admin', {
+      environment: 'staging',
+      run,
+    })
+
+    expect(process.exitCode).toBeUndefined()
+    expect(run).toHaveBeenCalledTimes(2)
+
+    const buildArgs = run.mock.calls[0][0]
+    const deployArgs = run.mock.calls[1][0]
+    expect(buildArgs).toEqual([
+      'build',
+      '--local-config',
+      join(cwd, 'vercel.admin.json'),
+      '--yes',
+      '--scope',
+      'team_xxx',
+      '--prod',
+    ])
+    expect(deployArgs).toEqual([
+      'deploy',
+      '--prebuilt',
+      '--local-config',
+      join(cwd, 'vercel.admin.json'),
+      '--yes',
+      '--scope',
+      'team_xxx',
+      '--prod',
+    ])
+    expect(run.mock.calls[0][1].cwd).toBe(adminCwd)
+    expect(run.mock.calls[1][1].cwd).toBe(adminCwd)
+    expect(logger.info).toHaveBeenCalledWith(expect.stringContaining('mode=prebuilt'))
+  })
+
+  test('deploy all keeps prebuilt mode while honoring target prebuilt cwd', async () => {
     const cwd = process.cwd()
     const frontCwd = join(cwd, 'apps/front')
     const adminCwd = join(cwd, 'apps/admin-front')
@@ -128,9 +179,32 @@ describe('deployToVercel()', () => {
     expect(run).toHaveBeenCalledTimes(4)
 
     expect(run.mock.calls[0][1].cwd).toBe(frontCwd)
-    expect(run.mock.calls[1][1].cwd).toBe(frontCwd)
+    expect(run.mock.calls[1][1].cwd).toBe(cwd)
     expect(run.mock.calls[2][1].cwd).toBe(adminCwd)
     expect(run.mock.calls[3][1].cwd).toBe(adminCwd)
+
+    const frontDeployArgs = run.mock.calls[1][0]
+    const adminDeployArgs = run.mock.calls[3][0]
+    expect(frontDeployArgs).toEqual([
+      'deploy',
+      '--prebuilt',
+      '--local-config',
+      join(cwd, 'vercel.front.json'),
+      '--yes',
+      '--scope',
+      'team_xxx',
+      '--prod',
+    ])
+    expect(adminDeployArgs).toEqual([
+      'deploy',
+      '--prebuilt',
+      '--local-config',
+      join(cwd, 'vercel.admin.json'),
+      '--yes',
+      '--scope',
+      'team_xxx',
+      '--prod',
+    ])
   })
 
   test('fails fast when target config file is missing', async () => {
@@ -158,11 +232,10 @@ describe('deployToVercel()', () => {
 
   test('fails on linked project mismatch when strictContext enabled', async () => {
     const cwd = process.cwd()
-    const frontCwd = join(cwd, 'apps/front')
     writeFileSync(join(cwd, 'vercel.front.json'), '{}')
-    mkdirSync(join(frontCwd, '.vercel'), { recursive: true })
+    mkdirSync(join(cwd, '.vercel'), { recursive: true })
     writeFileSync(
-      join(frontCwd, '.vercel/project.json'),
+      join(cwd, '.vercel/project.json'),
       JSON.stringify({ orgId: 'team_old', projectId: 'prj_old' }),
     )
 
@@ -181,11 +254,10 @@ describe('deployToVercel()', () => {
 
   test('continues on linked project mismatch when strictContext disabled', async () => {
     const cwd = process.cwd()
-    const frontCwd = join(cwd, 'apps/front')
     writeFileSync(join(cwd, 'vercel.front.json'), '{}')
-    mkdirSync(join(frontCwd, '.vercel'), { recursive: true })
+    mkdirSync(join(cwd, '.vercel'), { recursive: true })
     writeFileSync(
-      join(frontCwd, '.vercel/project.json'),
+      join(cwd, '.vercel/project.json'),
       JSON.stringify({ orgId: 'team_old', projectId: 'prj_old' }),
     )
 
@@ -203,11 +275,10 @@ describe('deployToVercel()', () => {
 
   test('removes linked project file before deploy in strict mode', async () => {
     const cwd = process.cwd()
-    const frontCwd = join(cwd, 'apps/front')
     writeFileSync(join(cwd, 'vercel.front.json'), '{}')
-    mkdirSync(join(frontCwd, '.vercel'), { recursive: true })
+    mkdirSync(join(cwd, '.vercel'), { recursive: true })
     writeFileSync(
-      join(frontCwd, '.vercel/project.json'),
+      join(cwd, '.vercel/project.json'),
       JSON.stringify({ orgId: 'team_xxx', projectId: 'prj_front' }),
     )
 
@@ -220,18 +291,17 @@ describe('deployToVercel()', () => {
     })
 
     expect(run).toHaveBeenCalledTimes(2)
-    expect(existsSync(join(frontCwd, '.vercel/project.json'))).toBe(false)
+    expect(existsSync(join(cwd, '.vercel/project.json'))).toBe(false)
   })
 
   test('deploy all isolates stale link context between targets in strict mode', async () => {
     const cwd = process.cwd()
-    const frontCwd = join(cwd, 'apps/front')
     const adminCwd = join(cwd, 'apps/admin-front')
     writeFileSync(join(cwd, 'vercel.front.json'), '{}')
     writeFileSync(join(cwd, 'vercel.admin.json'), '{}')
-    mkdirSync(join(frontCwd, '.vercel'), { recursive: true })
+    mkdirSync(join(cwd, '.vercel'), { recursive: true })
     writeFileSync(
-      join(frontCwd, '.vercel/project.json'),
+      join(cwd, '.vercel/project.json'),
       JSON.stringify({ orgId: 'team_xxx', projectId: 'prj_front' }),
     )
 
@@ -245,7 +315,7 @@ describe('deployToVercel()', () => {
 
     expect(process.exitCode).toBeUndefined()
     expect(run).toHaveBeenCalledTimes(4)
-    expect(existsSync(join(frontCwd, '.vercel/project.json'))).toBe(false)
+    expect(existsSync(join(cwd, '.vercel/project.json'))).toBe(false)
     expect(existsSync(join(adminCwd, '.vercel/project.json'))).toBe(false)
 
     const adminBuildEnv = run.mock.calls[2][1].env
@@ -270,6 +340,7 @@ describe('deployToVercel()', () => {
     expect(process.exitCode).toBe(1)
     expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('部署目录不存在'))
   })
+
 })
 
 describe('resolveTargetRunCwd()', () => {
@@ -281,5 +352,37 @@ describe('resolveTargetRunCwd()', () => {
   test('resolves absolute run cwd when deployCwd is configured', () => {
     const projectRoot = '/repo'
     expect(resolveTargetRunCwd(projectRoot, { deployCwd: 'apps/front' })).toBe('/repo/apps/front')
+  })
+})
+
+describe('resolveTargetDeployMode()', () => {
+  test('defaults to prebuilt when deployMode is missing', () => {
+    expect(resolveTargetDeployMode({ configFile: 'vercel.front.json' })).toBe('prebuilt')
+  })
+
+  test('uses target deployMode when configured', () => {
+    expect(resolveTargetDeployMode({ deployMode: 'prebuilt' })).toBe('prebuilt')
+  })
+})
+
+describe('resolveTargetPrebuiltCwd()', () => {
+  test('falls back to runCwd when prebuiltCwd is missing', () => {
+    expect(resolveTargetPrebuiltCwd('/repo', { deployCwd: 'apps/front' }, '/repo/apps/front')).toBe(
+      '/repo/apps/front',
+    )
+  })
+
+  test('resolves prebuiltCwd relative to project root', () => {
+    expect(resolveTargetPrebuiltCwd('/repo', { prebuiltCwd: '.' }, '/repo/apps/front')).toBe('/repo')
+  })
+})
+
+describe('isSupportedDeployMode()', () => {
+  test('accepts prebuilt only', () => {
+    expect(isSupportedDeployMode('prebuilt')).toBe(true)
+  })
+
+  test('rejects non-prebuilt mode', () => {
+    expect(isSupportedDeployMode('source')).toBe(false)
   })
 })
