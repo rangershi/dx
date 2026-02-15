@@ -62,7 +62,7 @@ describe('deployToVercel()', () => {
     expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('缺少以下 Vercel 环境变量'))
   })
 
-  test('build/deploy run with explicit scope/project/cwd/env args', async () => {
+  test('build/deploy run with explicit scope/cwd args', async () => {
     const cwd = process.cwd()
     writeFileSync(join(cwd, 'vercel.front.json'), '{}')
 
@@ -89,8 +89,6 @@ describe('deployToVercel()', () => {
       cwd,
       '--scope',
       'team_xxx',
-      '--project',
-      'prj_front',
       '--prod',
     ])
 
@@ -100,18 +98,10 @@ describe('deployToVercel()', () => {
       '--local-config',
       join(cwd, 'vercel.front.json'),
       '--yes',
-      '--env',
-      'APP_ENV=staging',
-      '--env',
-      'NEXT_PUBLIC_API_BASE=https://api.example.test',
-      '--env',
-      'NODE_ENV=production',
       '--cwd',
       cwd,
       '--scope',
       'team_xxx',
-      '--project',
-      'prj_front',
       '--prod',
     ])
   })
@@ -225,9 +215,9 @@ describe('deployToVercel()', () => {
     expect(run).toHaveBeenCalledTimes(4)
     expect(existsSync(join(cwd, '.vercel/project.json'))).toBe(false)
 
-    const adminBuildArgs = run.mock.calls[2][0]
-    const adminDeployArgs = run.mock.calls[3][0]
-    expect(adminBuildArgs).toContain('prj_admin')
-    expect(adminDeployArgs).toContain('prj_admin')
+    const adminBuildEnv = run.mock.calls[2][1].env
+    const adminDeployEnv = run.mock.calls[3][1].env
+    expect(adminBuildEnv.VERCEL_PROJECT_ID).toBe('prj_admin')
+    expect(adminDeployEnv.VERCEL_PROJECT_ID).toBe('prj_admin')
   })
 })
