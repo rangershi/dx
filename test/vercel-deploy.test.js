@@ -2,7 +2,7 @@ import { describe, test, expect, beforeEach, afterEach, jest } from '@jest/globa
 import { mkdtempSync, writeFileSync, rmSync, mkdirSync, existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
-import { deployToVercel } from '../lib/vercel-deploy.js'
+import { deployToVercel, resolveTargetRunCwd } from '../lib/vercel-deploy.js'
 import { logger } from '../lib/logger.js'
 
 describe('deployToVercel()', () => {
@@ -26,6 +26,9 @@ describe('deployToVercel()', () => {
     process.env.VERCEL_GIT_COMMIT_AUTHOR_EMAIL = ''
     process.env.APP_ENV = 'staging'
     process.env.NODE_ENV = 'production'
+
+    mkdirSync(join(tempDir, 'apps/front'), { recursive: true })
+    mkdirSync(join(tempDir, 'apps/admin-front'), { recursive: true })
   })
 
   afterEach(() => {
@@ -62,8 +65,9 @@ describe('deployToVercel()', () => {
     expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('缺少以下 Vercel 环境变量'))
   })
 
-  test('build/deploy run with explicit scope/cwd args', async () => {
+  test('front uses target deploy cwd while keeping absolute local-config', async () => {
     const cwd = process.cwd()
+    const frontCwd = join(cwd, 'apps/front')
     writeFileSync(join(cwd, 'vercel.front.json'), '{}')
 
     const run = jest.fn().mockResolvedValue({ code: 0, stdout: '', stderr: '' })
@@ -85,8 +89,6 @@ describe('deployToVercel()', () => {
       '--local-config',
       join(cwd, 'vercel.front.json'),
       '--yes',
-      '--cwd',
-      cwd,
       '--scope',
       'team_xxx',
       '--prod',
@@ -98,12 +100,37 @@ describe('deployToVercel()', () => {
       '--local-config',
       join(cwd, 'vercel.front.json'),
       '--yes',
-      '--cwd',
-      cwd,
       '--scope',
       'team_xxx',
       '--prod',
     ])
+
+    expect(run.mock.calls[0][1].cwd).toBe(frontCwd)
+    expect(run.mock.calls[1][1].cwd).toBe(frontCwd)
+  })
+
+  test('deploy all uses front/admin target-specific cwd', async () => {
+    const cwd = process.cwd()
+    const frontCwd = join(cwd, 'apps/front')
+    const adminCwd = join(cwd, 'apps/admin-front')
+    writeFileSync(join(cwd, 'vercel.front.json'), '{}')
+    writeFileSync(join(cwd, 'vercel.admin.json'), '{}')
+
+    const run = jest.fn().mockResolvedValue({ code: 0, stdout: '', stderr: '' })
+
+    await deployToVercel('all', {
+      environment: 'staging',
+      strictContext: false,
+      run,
+    })
+
+    expect(process.exitCode).toBeUndefined()
+    expect(run).toHaveBeenCalledTimes(4)
+
+    expect(run.mock.calls[0][1].cwd).toBe(frontCwd)
+    expect(run.mock.calls[1][1].cwd).toBe(frontCwd)
+    expect(run.mock.calls[2][1].cwd).toBe(adminCwd)
+    expect(run.mock.calls[3][1].cwd).toBe(adminCwd)
   })
 
   test('fails fast when target config file is missing', async () => {
@@ -131,10 +158,11 @@ describe('deployToVercel()', () => {
 
   test('fails on linked project mismatch when strictContext enabled', async () => {
     const cwd = process.cwd()
+    const frontCwd = join(cwd, 'apps/front')
     writeFileSync(join(cwd, 'vercel.front.json'), '{}')
-    mkdirSync(join(cwd, '.vercel'), { recursive: true })
+    mkdirSync(join(frontCwd, '.vercel'), { recursive: true })
     writeFileSync(
-      join(cwd, '.vercel/project.json'),
+      join(frontCwd, '.vercel/project.json'),
       JSON.stringify({ orgId: 'team_old', projectId: 'prj_old' }),
     )
 
@@ -153,10 +181,11 @@ describe('deployToVercel()', () => {
 
   test('continues on linked project mismatch when strictContext disabled', async () => {
     const cwd = process.cwd()
+    const frontCwd = join(cwd, 'apps/front')
     writeFileSync(join(cwd, 'vercel.front.json'), '{}')
-    mkdirSync(join(cwd, '.vercel'), { recursive: true })
+    mkdirSync(join(frontCwd, '.vercel'), { recursive: true })
     writeFileSync(
-      join(cwd, '.vercel/project.json'),
+      join(frontCwd, '.vercel/project.json'),
       JSON.stringify({ orgId: 'team_old', projectId: 'prj_old' }),
     )
 
@@ -174,10 +203,11 @@ describe('deployToVercel()', () => {
 
   test('removes linked project file before deploy in strict mode', async () => {
     const cwd = process.cwd()
+    const frontCwd = join(cwd, 'apps/front')
     writeFileSync(join(cwd, 'vercel.front.json'), '{}')
-    mkdirSync(join(cwd, '.vercel'), { recursive: true })
+    mkdirSync(join(frontCwd, '.vercel'), { recursive: true })
     writeFileSync(
-      join(cwd, '.vercel/project.json'),
+      join(frontCwd, '.vercel/project.json'),
       JSON.stringify({ orgId: 'team_xxx', projectId: 'prj_front' }),
     )
 
@@ -190,16 +220,18 @@ describe('deployToVercel()', () => {
     })
 
     expect(run).toHaveBeenCalledTimes(2)
-    expect(existsSync(join(cwd, '.vercel/project.json'))).toBe(false)
+    expect(existsSync(join(frontCwd, '.vercel/project.json'))).toBe(false)
   })
 
   test('deploy all isolates stale link context between targets in strict mode', async () => {
     const cwd = process.cwd()
+    const frontCwd = join(cwd, 'apps/front')
+    const adminCwd = join(cwd, 'apps/admin-front')
     writeFileSync(join(cwd, 'vercel.front.json'), '{}')
     writeFileSync(join(cwd, 'vercel.admin.json'), '{}')
-    mkdirSync(join(cwd, '.vercel'), { recursive: true })
+    mkdirSync(join(frontCwd, '.vercel'), { recursive: true })
     writeFileSync(
-      join(cwd, '.vercel/project.json'),
+      join(frontCwd, '.vercel/project.json'),
       JSON.stringify({ orgId: 'team_xxx', projectId: 'prj_front' }),
     )
 
@@ -213,11 +245,41 @@ describe('deployToVercel()', () => {
 
     expect(process.exitCode).toBeUndefined()
     expect(run).toHaveBeenCalledTimes(4)
-    expect(existsSync(join(cwd, '.vercel/project.json'))).toBe(false)
+    expect(existsSync(join(frontCwd, '.vercel/project.json'))).toBe(false)
+    expect(existsSync(join(adminCwd, '.vercel/project.json'))).toBe(false)
 
     const adminBuildEnv = run.mock.calls[2][1].env
     const adminDeployEnv = run.mock.calls[3][1].env
     expect(adminBuildEnv.VERCEL_PROJECT_ID).toBe('prj_admin')
     expect(adminDeployEnv.VERCEL_PROJECT_ID).toBe('prj_admin')
+  })
+
+  test('fails fast when target deploy cwd does not exist', async () => {
+    const cwd = process.cwd()
+    writeFileSync(join(cwd, 'vercel.front.json'), '{}')
+    rmSync(join(cwd, 'apps/front'), { recursive: true, force: true })
+
+    const run = jest.fn().mockResolvedValue({ code: 0, stdout: '', stderr: '' })
+
+    await deployToVercel('front', {
+      environment: 'staging',
+      run,
+    })
+
+    expect(run).not.toHaveBeenCalled()
+    expect(process.exitCode).toBe(1)
+    expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('部署目录不存在'))
+  })
+})
+
+describe('resolveTargetRunCwd()', () => {
+  test('falls back to project root when deployCwd is missing', () => {
+    const projectRoot = '/repo'
+    expect(resolveTargetRunCwd(projectRoot, { configFile: 'vercel.telegram-bot.json' })).toBe(projectRoot)
+  })
+
+  test('resolves absolute run cwd when deployCwd is configured', () => {
+    const projectRoot = '/repo'
+    expect(resolveTargetRunCwd(projectRoot, { deployCwd: 'apps/front' })).toBe('/repo/apps/front')
   })
 })
