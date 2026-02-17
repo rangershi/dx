@@ -96,6 +96,7 @@ agent: sisyphus
   - `decisionLogFile: ./.cache/decision-log-pr{{PR_NUMBER}}.md`（如存在）
 - reviewer 默认读 `contextFile`；如果 `decisionLogFile` 存在，reviewer 应在 prompt 中提供该文件路径以参考前轮决策；必要时允许用 `git/gh` 只读命令拿 diff
 - 忽略问题：1.格式化代码引起的噪音 2.已经lint检查以外的格式问题 3.忽略单元测试不足的问题
+- 对于重构代码，不必考虑和以前版本数据的兼容性问题，直接切换就行
 - 特别关注: 逻辑、安全、性能、可维护性
 - 遵守 Decision Log：
   - 已修复（Fixed）：不再提
