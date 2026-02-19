@@ -96,6 +96,8 @@ describe('deployToVercel()', () => {
       '--yes',
       '--scope',
       'team_xxx',
+      '--token',
+      'test-token',
       '--prod',
     ])
 
@@ -107,6 +109,8 @@ describe('deployToVercel()', () => {
       '--yes',
       '--scope',
       'team_xxx',
+      '--token',
+      'test-token',
       '--prod',
     ])
 
@@ -142,6 +146,8 @@ describe('deployToVercel()', () => {
       '--yes',
       '--scope',
       'team_xxx',
+      '--token',
+      'test-token',
       '--prod',
     ])
     expect(deployArgs).toEqual([
@@ -152,6 +158,8 @@ describe('deployToVercel()', () => {
       '--yes',
       '--scope',
       'team_xxx',
+      '--token',
+      'test-token',
       '--prod',
     ])
     expect(run.mock.calls[0][1].cwd).toBe(adminCwd)
@@ -191,6 +199,8 @@ describe('deployToVercel()', () => {
       '--yes',
       '--scope',
       'team_xxx',
+      '--token',
+      'test-token',
       '--prod',
     ])
     expect(adminDeployArgs).toEqual([
@@ -201,6 +211,8 @@ describe('deployToVercel()', () => {
       '--yes',
       '--scope',
       'team_xxx',
+      '--token',
+      'test-token',
       '--prod',
     ])
   })
