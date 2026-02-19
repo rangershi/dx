@@ -73,7 +73,6 @@ describe('deployToVercel()', () => {
 
   test('front uses prebuilt deploy mode with separate prebuiltCwd', async () => {
     const cwd = process.cwd()
-    const frontCwd = join(cwd, 'apps/front')
     writeFileSync(join(cwd, 'vercel.front.json'), '{}')
 
     const run = jest.fn().mockResolvedValue({ code: 0, stdout: '', stderr: '' })
@@ -111,11 +110,11 @@ describe('deployToVercel()', () => {
       '--prod',
     ])
 
-    expect(run.mock.calls[0][1].cwd).toBe(frontCwd)
+    expect(run.mock.calls[0][1].cwd).toBe(cwd)
     expect(run.mock.calls[1][1].cwd).toBe(cwd)
     expect(logger.info).toHaveBeenCalledWith(expect.stringContaining('[deploy-context]'))
     expect(logger.info).toHaveBeenCalledWith(expect.stringContaining('mode=prebuilt'))
-    expect(logger.info).toHaveBeenCalledWith(expect.stringContaining(`runCwd=${frontCwd}`))
+    expect(logger.info).toHaveBeenCalledWith(expect.stringContaining(`runCwd=${cwd}`))
     expect(logger.info).toHaveBeenCalledWith(expect.stringContaining(`prebuiltCwd=${cwd}`))
   })
 
@@ -162,7 +161,6 @@ describe('deployToVercel()', () => {
 
   test('deploy all keeps prebuilt mode while honoring target prebuilt cwd', async () => {
     const cwd = process.cwd()
-    const frontCwd = join(cwd, 'apps/front')
     const adminCwd = join(cwd, 'apps/admin-front')
     writeFileSync(join(cwd, 'vercel.front.json'), '{}')
     writeFileSync(join(cwd, 'vercel.admin.json'), '{}')
@@ -178,7 +176,7 @@ describe('deployToVercel()', () => {
     expect(process.exitCode).toBeUndefined()
     expect(run).toHaveBeenCalledTimes(4)
 
-    expect(run.mock.calls[0][1].cwd).toBe(frontCwd)
+    expect(run.mock.calls[0][1].cwd).toBe(cwd)
     expect(run.mock.calls[1][1].cwd).toBe(cwd)
     expect(run.mock.calls[2][1].cwd).toBe(adminCwd)
     expect(run.mock.calls[3][1].cwd).toBe(adminCwd)
@@ -326,12 +324,12 @@ describe('deployToVercel()', () => {
 
   test('fails fast when target deploy cwd does not exist', async () => {
     const cwd = process.cwd()
-    writeFileSync(join(cwd, 'vercel.front.json'), '{}')
-    rmSync(join(cwd, 'apps/front'), { recursive: true, force: true })
+    writeFileSync(join(cwd, 'vercel.admin.json'), '{}')
+    rmSync(join(cwd, 'apps/admin-front'), { recursive: true, force: true })
 
     const run = jest.fn().mockResolvedValue({ code: 0, stdout: '', stderr: '' })
 
-    await deployToVercel('front', {
+    await deployToVercel('admin', {
       environment: 'staging',
       run,
     })
