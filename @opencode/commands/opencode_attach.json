@@ -10,13 +10,13 @@
   ],
   "agent": {
     "quick": {
-      "model": "openai/gpt-5.3-codex-spark"
+      "model": "openai/gpt-5.1-codex-min"
     },
     "middle": {
       "model": "openai/gpt-5.3-codex"
     },
     "documenter": {
-      "model": "openai/gpt-5.3-codex-spark"
+      "model": "openai/gpt-5.1-codex-min"
     }
   },
   "permission": {
