@@ -238,7 +238,7 @@ describe('deployToVercel()', () => {
     expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('不支持的部署目标'))
   })
 
-  test('fails on linked project mismatch when strictContext enabled', async () => {
+  test('auto-cleans and continues on linked project mismatch when strictContext enabled', async () => {
     const cwd = process.cwd()
     writeFileSync(join(cwd, 'vercel.front.json'), '{}')
     mkdirSync(join(cwd, '.vercel'), { recursive: true })
@@ -255,9 +255,10 @@ describe('deployToVercel()', () => {
       run,
     })
 
-    expect(run).not.toHaveBeenCalled()
-    expect(process.exitCode).toBe(1)
+    expect(run).toHaveBeenCalledTimes(2)
+    expect(process.exitCode).toBeUndefined()
     expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('检测到 .vercel 链接冲突'))
+    expect(existsSync(join(cwd, '.vercel'))).toBe(false)
   })
 
   test('continues on linked project mismatch when strictContext disabled', async () => {
@@ -300,6 +301,25 @@ describe('deployToVercel()', () => {
 
     expect(run).toHaveBeenCalledTimes(2)
     expect(existsSync(join(cwd, '.vercel/project.json'))).toBe(false)
+  })
+
+  test('cleans stale .vercel/output before build to avoid EEXIST conflicts', async () => {
+    const cwd = process.cwd()
+    writeFileSync(join(cwd, 'vercel.front.json'), '{}')
+    mkdirSync(join(cwd, '.vercel/output/functions'), { recursive: true })
+    writeFileSync(join(cwd, '.vercel/output/functions/stale.txt'), 'stale')
+
+    const run = jest.fn().mockResolvedValue({ code: 0, stdout: '', stderr: '' })
+
+    await deployToVercel('front', {
+      environment: 'staging',
+      strictContext: true,
+      run,
+    })
+
+    expect(run).toHaveBeenCalledTimes(2)
+    expect(process.exitCode).toBeUndefined()
+    expect(existsSync(join(cwd, '.vercel/output'))).toBe(false)
   })
 
   test('deploy all isolates stale link context between targets in strict mode', async () => {
