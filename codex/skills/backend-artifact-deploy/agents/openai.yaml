@@ -1,0 +1,4 @@
+interface:
+  display_name: "后端制品部署"
+  short_description: "跨项目复用的后端制品构建发布与双层环境变量合并流程"
+  default_prompt: "Use $backend-artifact-deploy to design and implement source-free backend artifact deployment with layered env handling."

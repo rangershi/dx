@@ -1,6 +1,6 @@
 {
   "name": "@ranger1/dx",
-  "version": "0.1.64",
+  "version": "0.1.65",
   "type": "module",
   "license": "MIT",
   "repository": {
@@ -19,6 +19,7 @@
     "bin/",
     "lib/",
     "@opencode/",
+    "codex/",
     "LICENSE",
     "README.md",
     "package.json"

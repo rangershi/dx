@@ -1,0 +1,4 @@
+interface:
+  display_name: "Git Release"
+  short_description: "在 release 分支上自动完成版本发布与发行说明生成"
+  default_prompt: "使用 $git-release 按规范执行一次发布并生成高质量发行说明。"

@@ -124,7 +124,6 @@ describe('deployToVercel()', () => {
 
   test('admin keeps prebuilt deploy mode', async () => {
     const cwd = process.cwd()
-    const adminCwd = join(cwd, 'apps/admin-front')
     writeFileSync(join(cwd, 'vercel.admin.json'), '{}')
 
     const run = jest.fn().mockResolvedValue({ code: 0, stdout: '', stderr: '' })
@@ -162,14 +161,13 @@ describe('deployToVercel()', () => {
       'test-token',
       '--prod',
     ])
-    expect(run.mock.calls[0][1].cwd).toBe(adminCwd)
-    expect(run.mock.calls[1][1].cwd).toBe(adminCwd)
+    expect(run.mock.calls[0][1].cwd).toBe(cwd)
+    expect(run.mock.calls[1][1].cwd).toBe(cwd)
     expect(logger.info).toHaveBeenCalledWith(expect.stringContaining('mode=prebuilt'))
   })
 
   test('deploy all keeps prebuilt mode while honoring target prebuilt cwd', async () => {
     const cwd = process.cwd()
-    const adminCwd = join(cwd, 'apps/admin-front')
     writeFileSync(join(cwd, 'vercel.front.json'), '{}')
     writeFileSync(join(cwd, 'vercel.admin.json'), '{}')
 
@@ -186,8 +184,8 @@ describe('deployToVercel()', () => {
 
     expect(run.mock.calls[0][1].cwd).toBe(cwd)
     expect(run.mock.calls[1][1].cwd).toBe(cwd)
-    expect(run.mock.calls[2][1].cwd).toBe(adminCwd)
-    expect(run.mock.calls[3][1].cwd).toBe(adminCwd)
+    expect(run.mock.calls[2][1].cwd).toBe(cwd)
+    expect(run.mock.calls[3][1].cwd).toBe(cwd)
 
     const frontDeployArgs = run.mock.calls[1][0]
     const adminDeployArgs = run.mock.calls[3][0]
@@ -306,7 +304,7 @@ describe('deployToVercel()', () => {
 
   test('deploy all isolates stale link context between targets in strict mode', async () => {
     const cwd = process.cwd()
-    const adminCwd = join(cwd, 'apps/admin-front')
+    const adminCwd = cwd
     writeFileSync(join(cwd, 'vercel.front.json'), '{}')
     writeFileSync(join(cwd, 'vercel.admin.json'), '{}')
     mkdirSync(join(cwd, '.vercel'), { recursive: true })
@@ -334,7 +332,7 @@ describe('deployToVercel()', () => {
     expect(adminDeployEnv.VERCEL_PROJECT_ID).toBe('prj_admin')
   })
 
-  test('fails fast when target deploy cwd does not exist', async () => {
+  test('admin deploy cwd defaults to project root and still runs when apps/admin-front is missing', async () => {
     const cwd = process.cwd()
     writeFileSync(join(cwd, 'vercel.admin.json'), '{}')
     rmSync(join(cwd, 'apps/admin-front'), { recursive: true, force: true })
@@ -346,9 +344,8 @@ describe('deployToVercel()', () => {
       run,
     })
 
-    expect(run).not.toHaveBeenCalled()
-    expect(process.exitCode).toBe(1)
-    expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('部署目录不存在'))
+    expect(run).toHaveBeenCalledTimes(2)
+    expect(process.exitCode).toBeUndefined()
   })
 
 })
