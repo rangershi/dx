@@ -28,13 +28,14 @@ describe('telegram-webhook URL parsing', () => {
     Object.assign(process.env, ORIGINAL_ENV)
   })
 
-  test('parseDeployUrlFromDeployOutput() picks the last *.vercel.app', () => {
+  test('parseDeployUrlFromDeployOutput() prefers Production over Preview and ignores helper hint domain', () => {
     const output = [
       'Vercel CLI output',
       'Inspect: https://vercel.com/acme/foo/abc123',
+      'To deploy to production (foo-helper.vercel.app), run `vercel --prod`',
       'Preview: https://first-preview.vercel.app',
       'More logs...',
-      'Ready: second-ready.vercel.app',
+      'Production: second-ready.vercel.app',
     ].join('\n')
 
     expect(parseDeployUrlFromDeployOutput(output)).toBe('https://second-ready.vercel.app')
@@ -84,10 +85,14 @@ describe('telegram-webhook URL parsing', () => {
         deployOutput: 'done: https://x-1.vercel.app',
         projectNameHint: 'telegram-bot',
       }),
-    ).rejects.toThrow('缺少必需环境变量')
+    ).resolves.toMatchObject({
+      status: 'failed',
+      reason: 'missing_env_vars',
+      strict: true,
+    })
   })
 
-  test('handleTelegramBotDeploy() is non-strict by default in development', async () => {
+  test('handleTelegramBotDeploy() is strict by default in development', async () => {
     delete process.env.TELEGRAM_BOT_TOKEN
     delete process.env.TELEGRAM_BOT_WEBHOOK_SECRET
     process.env.DX_TELEGRAM_WEBHOOK_DRY_RUN = '1'
@@ -97,6 +102,28 @@ describe('telegram-webhook URL parsing', () => {
         deployOutput: 'done: https://x-1.vercel.app',
         projectNameHint: 'telegram-bot',
       }),
-    ).resolves.toBeUndefined()
+    ).resolves.toMatchObject({
+      status: 'failed',
+      reason: 'missing_env_vars',
+      strict: true,
+    })
+  })
+
+  test('handleTelegramBotDeploy() returns structured status in non-strict mode', async () => {
+    delete process.env.TELEGRAM_BOT_TOKEN
+    process.env.TELEGRAM_BOT_WEBHOOK_SECRET = 'secret'
+    process.env.DX_TELEGRAM_WEBHOOK_DRY_RUN = '1'
+
+    await expect(
+      handleTelegramBotDeploy('production', 'prj_123', 'team_x', 'token_x', {
+        strict: false,
+        deployOutput: 'done: https://x-1.vercel.app',
+        projectNameHint: 'telegram-bot',
+      }),
+    ).resolves.toMatchObject({
+      status: 'warning',
+      reason: 'missing_env_vars',
+      strict: false,
+    })
   })
 })

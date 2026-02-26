@@ -15,6 +15,8 @@ describe('deployToVercel()', () => {
   let originalCwd
   let tempDir
   let errorSpy
+  let warnSpy
+  let successSpy
 
   beforeEach(() => {
     originalCwd = process.cwd()
@@ -22,6 +24,8 @@ describe('deployToVercel()', () => {
     process.chdir(tempDir)
 
     errorSpy = jest.spyOn(logger, 'error').mockImplementation(() => {})
+    warnSpy = jest.spyOn(logger, 'warn').mockImplementation(() => {})
+    successSpy = jest.spyOn(logger, 'success').mockImplementation(() => {})
     jest.spyOn(logger, 'info').mockImplementation(() => {})
 
     process.env.VERCEL_TOKEN = 'test-token'
@@ -366,6 +370,55 @@ describe('deployToVercel()', () => {
 
     expect(run).toHaveBeenCalledTimes(2)
     expect(process.exitCode).toBeUndefined()
+  })
+
+  test('telegram-bot prints validated message only on success status', async () => {
+    const cwd = process.cwd()
+    writeFileSync(join(cwd, 'vercel.telegram-bot.json'), '{}')
+
+    const run = jest.fn().mockResolvedValue({ code: 0, stdout: 'Production: tg-ready.vercel.app', stderr: '' })
+    const telegramWebhookHandler = jest.fn().mockResolvedValue({
+      status: 'warning',
+      reason: 'verify_failed',
+      message: 'webhook mismatch',
+      strict: false,
+    })
+
+    await deployToVercel('telegram-bot', {
+      environment: 'production',
+      telegramWebhook: { strict: false },
+      telegramWebhookHandler,
+      run,
+    })
+
+    expect(process.exitCode).toBeUndefined()
+    expect(telegramWebhookHandler).toHaveBeenCalledTimes(1)
+    expect(successSpy).not.toHaveBeenCalledWith(expect.stringContaining('Webhook 已校验'))
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('Webhook 未完成校验'))
+  })
+
+  test('telegram-bot exits with failure when webhook status is failed', async () => {
+    const cwd = process.cwd()
+    writeFileSync(join(cwd, 'vercel.telegram-bot.json'), '{}')
+
+    const run = jest.fn().mockResolvedValue({ code: 0, stdout: 'Production: tg-ready.vercel.app', stderr: '' })
+    const telegramWebhookHandler = jest.fn().mockResolvedValue({
+      status: 'failed',
+      reason: 'set_webhook_failed',
+      message: 'forbidden',
+      strict: true,
+    })
+
+    await deployToVercel('telegram-bot', {
+      environment: 'production',
+      telegramWebhook: { strict: true },
+      telegramWebhookHandler,
+      run,
+    })
+
+    expect(process.exitCode).toBe(1)
+    expect(successSpy).not.toHaveBeenCalledWith(expect.stringContaining('Webhook 已校验'))
+    expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('Webhook 配置失败'))
   })
 
 })
