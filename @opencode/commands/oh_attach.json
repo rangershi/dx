@@ -18,17 +18,17 @@
       "model": "openai/gpt-5.3-codex"
     },
     "explore": {
-      "model": "openai/gpt-5.1-codex-min"
+      "model": "openai/gpt-5.3-codex"
     },
     "multimodal-looker": {
       "model": "openai/gpt-5.3-codex"
     },
     "prometheus": {
-      "model": "openai/gpt-5.2",
+      "model": "gpt-5.3-codex",
       "variant": "max"
     },
     "metis": {
-      "model": "openai/gpt-5.2",
+      "model": "gpt-5.3-codex",
       "variant": "max"
     },
     "momus": {
@@ -75,7 +75,7 @@
       "model": "openai/gpt-5.1-codex-min"
     },
     "middle": {
-      "model": "openai/gpt-5.1-codex-min"
+      "model": "openai/gpt-5.3-codex"
     },
     "unspecified-low": {
       "model": "openai/gpt-5.1-codex-min",
@@ -86,7 +86,7 @@
       "variant": "medium"
     },
     "writing": {
-      "model": "openai/gpt-5.1-codex-min"
+      "model": "openai/gpt-5.3-codex"
     }
   }
 }

@@ -1,7 +1,6 @@
 ---
 allowed-tools: [Bash, Read, Glob, TodoWrite, Edit, Grep, Task]
 description: '循环审核修复'
-agent: sisyphus
 ---
 
 # PR Review Loop
@@ -151,14 +150,14 @@ agent: sisyphus
 gh auth status
 
 # 1) precheck（round 1）
-python3 "./@opencode/agents/pr_precheck.py" --pr <PR_NUMBER> --round 1
+python3 "~/.opencode/agents/pr_precheck.py" --pr <PR_NUMBER> --round 1
 
 # 2) context（round 1）
-python3 "./@opencode/agents/pr_context.py" --pr <PR_NUMBER> --round 1
+python3 "~/.opencode/agents/pr_context.py" --pr <PR_NUMBER> --round 1
 
 # 3) 校验：两者都必须输出单行 JSON，且 runId 必须一致
-python3 "./@opencode/agents/pr_precheck.py" --pr <PR_NUMBER> --round 1 > ./.cache/_precheck.json
-python3 "./@opencode/agents/pr_context.py" --pr <PR_NUMBER> --round 1 > ./.cache/_context.json
+python3 "~/.opencode/agents/pr_precheck.py" --pr <PR_NUMBER> --round 1 > ./.cache/_precheck.json
+python3 "~/.opencode/agents/pr_context.py" --pr <PR_NUMBER> --round 1 > ./.cache/_context.json
 python3 - <<'PY'
 import json
 p=json.load(open('./.cache/_precheck.json'))
@@ -168,7 +167,7 @@ print('OK', p.get('runId'))
 PY
 
 # 4) 运行脚本相关测试（注意：pytest 把 @ 当作 argfile；必须加 ./ 并加引号）
-python3 -m pytest -q "./@opencode/agents/test_pr_review_aggregate.py"
+python3 -m pytest -q "~/.opencode/agents/test_pr_review_aggregate.py"
 ```
 
 ## 终止与收尾（强制）
