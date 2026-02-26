@@ -8,6 +8,9 @@ importers:
 
   .:
     dependencies:
+      '@ranger1/dx':
+        specifier: 0.1.67
+        version: 0.1.67
       strip-json-comments:
         specifier: ^5.0.3
         version: 5.0.3
@@ -364,6 +367,11 @@ packages:
     resolution: {integrity: sha512-Jb8YsA7/GKGWWg2RkaDJQalaOpiQCPb57PtxNV5Ai7bsapM/7g/OfwenZXfH32FUoCT4yPVrnrKdjqbBHdEkxA==}
     cpu: [x64]
     os: [win32]
+
+  '@ranger1/dx@0.1.67':
+    resolution: {integrity: sha512-d1S+xneCtpf0X5l4YILUf0iObACdHTFnOCMUFaPWb1IEEDTIHVf2hBx6nPGrZtI0yPSq6pgwKHFGzWlyYl/U6A==}
+    engines: {node: '>=20.11.0'}
+    hasBin: true
 
   '@sinclair/typebox@0.27.8':
     resolution: {integrity: sha512-+Fj43pSMwJs4KRrH/938Uf+uAELIgVBmQzg/q1YG10djyfA3TnrU8N8XzqCh/okZdszqBQTZf96idMfE5lnwTA==}
@@ -1929,6 +1937,11 @@ snapshots:
 
   '@nx/nx-win32-x64-msvc@22.4.4':
     optional: true
+
+  '@ranger1/dx@0.1.67':
+    dependencies:
+      strip-json-comments: 5.0.3
+      yaml: 2.8.2
 
   '@sinclair/typebox@0.27.8': {}
 
