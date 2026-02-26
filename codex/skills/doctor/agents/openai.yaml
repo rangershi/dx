@@ -1,0 +1,4 @@
+interface:
+  display_name: "Doctor"
+  short_description: "并行检测并自动修复 Codex 开发环境关键依赖与特性开关"
+  default_prompt: "使用 $doctor 对当前系统执行并行体检、自动修复与三轮内收敛验证，并输出最终版本报告。"

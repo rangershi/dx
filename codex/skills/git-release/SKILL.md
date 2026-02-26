@@ -7,7 +7,7 @@ description: 在 Git 仓库中执行标准化版本发布流程并自动生成�
 
 ## 目标
 
-在 `release/vX.Y.Z` 或 `release/vX.Y.Z-<prerelease>.N` 分支上，完成从发布前检查到 GitHub Release 创建的全流程。
+在 `release/vX.Y.Z` 或 `release/vX.Y.Z-<prerelease>.N` 分支上，完成从发布前检查到 GitHub Release 创建的全流程；若当前不在 release 分支，则先从最新 `main` 自动创建目标 release 分支。
 
 ## 执行原则
 
@@ -23,12 +23,17 @@ description: 在 Git 仓库中执行标准化版本发布流程并自动生成�
 1. 检查工作区是否干净：`git status --porcelain`。
 2. 若存在未提交变更，列出文件并终止流程。
 3. 检查当前分支：`git branch --show-current`。
-4. 仅接受以下正则：`^release/v\d+\.\d+\.\d+(-(alpha|beta|rc)\.\d+)?$`。
-5. 从分支名提取版本号，例如：
+4. 若当前分支不匹配 `^release/v\d+\.\d+\.\d+(-(alpha|beta|rc)\.\d+)?$`，执行以下自动建分支流程（仅此场景执行）：
+- 同步远程与本地 `main`：`git fetch origin main --tags && git checkout main && git pull --ff-only origin main`。
+- 获取上一个已发布版本（优先）：`gh release list --limit 1 --json tagName,publishedAt --jq '.[0].tagName'`；若为空则回退 `git describe --tags --abbrev=0`。
+- 解析版本号并将最后一位加一（例如 `v1.2.3 -> v1.2.4`），得到新分支版本 `<NEXT_VERSION>`。
+- 创建并切换分支：`git checkout -b release/v<NEXT_VERSION>`。
+5. 再次检查当前分支，必须匹配：`^release/v\d+\.\d+\.\d+(-(alpha|beta|rc)\.\d+)?$`。
+6. 从分支名提取版本号，例如：
 - `release/v1.2.3` -> `v1.2.3` -> `1.2.3`
 - `release/v1.2.3-beta.2` -> `v1.2.3-beta.2` -> `1.2.3-beta.2`
-6. 检查目标 tag 是否已存在：`git tag -l "v<VERSION>"`。
-7. 向用户确认版本号；若用户修改版本号，重新校验格式与 tag 冲突。
+7. 检查目标 tag 是否已存在：`git tag -l "v<VERSION>"`。
+8. 向用户确认版本号；若用户修改版本号，重新校验格式与 tag 冲突。
 
 ### 二、更新版本号
 
@@ -156,7 +161,7 @@ EOF
 以下任一情况出现时终止流程并给出明确原因：
 
 - 工作区存在未提交修改。
-- 当前分支不符合 release 分支命名规则。
+- 当前分支不符合 release 分支命名规则，且无法从 `main` 自动创建 release 分支。
 - 版本号格式非法或与现有 tag 冲突。
 - 自上次发布以来无新提交。
 

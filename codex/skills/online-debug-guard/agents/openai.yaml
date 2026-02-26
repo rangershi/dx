@@ -1,0 +1,4 @@
+interface:
+  display_name: "Online Debug Guard"
+  short_description: "Guarded workflow for environment-aware online debugging"
+  default_prompt: "执行安全的在线调试流程，先判定环境与模式，再执行只读排查。"
