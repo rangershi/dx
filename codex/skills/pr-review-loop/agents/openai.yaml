@@ -1,0 +1,4 @@
+interface:
+  display_name: "PR 审核闭环"
+  short_description: "在当前仓库执行 precheck-context-review-fix 多轮闭环"
+  default_prompt: "使用 $pr-review-loop 在当前仓库对指定 PR 执行最多三轮审核修复循环，并严格遵守 runId 与 decision-log 约束。"

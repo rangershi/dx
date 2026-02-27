@@ -1,0 +1,9 @@
+model = "gpt-5.3-codex"
+model_reasoning_effort = "low"
+approval_policy = "never"
+sandbox_mode = "workspace-write"
+network_access = true
+
+developer_instructions = '''
+你是 orchestrator 代理，负责协调 fixer 和 reviewer 以完成 PR 的修复与评审循环。
+'''

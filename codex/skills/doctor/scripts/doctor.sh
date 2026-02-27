@@ -21,6 +21,7 @@ fi
 
 CACHE_ROOT="${PWD}/.cache/doctor"
 mkdir -p "$CACHE_ROOT"
+CODEX_HOME="${CODEX_HOME:-$HOME/.codex}"
 
 LAST_CHECK_DIR=""
 DX_FORCE_OK=0
@@ -177,6 +178,251 @@ ensure_multi_agent() {
   echo "$line" | grep -E "experimental[[:space:]]+true" >/dev/null 2>&1
 }
 
+ensure_codex_config() {
+  local cfg_dir cfg_file tmp_file
+  cfg_dir="$CODEX_HOME"
+  cfg_file="$cfg_dir/config.toml"
+  tmp_file="$cfg_file.tmp.$$"
+
+  mkdir -p "$cfg_dir"
+  if [[ ! -f "$cfg_file" ]]; then
+    : >"$cfg_file"
+  fi
+
+  awk '
+  BEGIN {
+    in_features=0; in_agents=0; in_fixer=0; in_orch=0; in_reviewer=0; in_spark=0;
+    features_emitted=0; agents_emitted=0; fixer_emitted=0; orch_emitted=0; reviewer_emitted=0; spark_emitted=0;
+    features_multi_written=0; agents_max_threads_written=0;
+    fixer_desc_written=0; fixer_reasoning_written=0; fixer_cfg_written=0;
+    orch_desc_written=0; orch_cfg_written=0;
+    reviewer_desc_written=0; reviewer_cfg_written=0;
+    spark_desc_written=0; spark_cfg_written=0;
+  }
+  function trim(s) { gsub(/^[[:space:]]+|[[:space:]]+$/, "", s); return s }
+  function reset_sections() {
+    in_features=0; in_agents=0; in_fixer=0; in_orch=0; in_reviewer=0; in_spark=0;
+  }
+  function flush_features() {
+    if (!features_emitted) return;
+    if (!features_multi_written) print "multi_agent = true";
+  }
+  function flush_agents() {
+    if (!agents_emitted) return;
+    if (!agents_max_threads_written) print "max_threads = 15";
+  }
+  function flush_fixer() {
+    if (!fixer_emitted) return;
+    if (!fixer_desc_written) print "description = \"bug fixer\"";
+    if (!fixer_reasoning_written) print "model_reasoning_effort = \"medium\"";
+    if (!fixer_cfg_written) print "config_file = \"~/.codex/agents/fixer.toml\"";
+  }
+  function flush_orch() {
+    if (!orch_emitted) return;
+    if (!orch_desc_written) print "description = \"orchestrator\"";
+    if (!orch_cfg_written) print "config_file = \"~/.codex/agents/orchestrator.toml\"";
+  }
+  function flush_reviewer() {
+    if (!reviewer_emitted) return;
+    if (!reviewer_desc_written) print "description = \"reviewer\"";
+    if (!reviewer_cfg_written) print "config_file = \"~/.codex/agents/reviewer.toml\"";
+  }
+  function flush_spark() {
+    if (!spark_emitted) return;
+    if (!spark_desc_written) print "description = \"spark\"";
+    if (!spark_cfg_written) print "config_file = \"~/.codex/agents/spark.toml\"";
+  }
+  function flush_active_section() {
+    if (in_features) flush_features();
+    if (in_agents) flush_agents();
+    if (in_fixer) flush_fixer();
+    if (in_orch) flush_orch();
+    if (in_reviewer) flush_reviewer();
+    if (in_spark) flush_spark();
+  }
+  function enter_section(line) {
+    if (line == "[features]") {
+      in_features=1; features_emitted=1;
+      return;
+    }
+    if (line == "[agents]") {
+      in_agents=1; agents_emitted=1;
+      return;
+    }
+    if (line == "[agents.fixer]") {
+      in_fixer=1; fixer_emitted=1;
+      return;
+    }
+    if (line == "[agents.orchestrator]") {
+      in_orch=1; orch_emitted=1;
+      return;
+    }
+    if (line == "[agents.reviewer]") {
+      in_reviewer=1; reviewer_emitted=1;
+      return;
+    }
+    if (line == "[agents.spark]") {
+      in_spark=1; spark_emitted=1;
+      return;
+    }
+  }
+  {
+    line=$0;
+    t=trim(line);
+    if (match(t, /^\[[^]]+\]$/)) {
+      flush_active_section();
+      reset_sections();
+      enter_section(t);
+      print line;
+      next;
+    }
+
+    if (in_features && match(t, /^multi_agent[[:space:]]*=/)) {
+      if (!features_multi_written) {
+        print "multi_agent = true";
+        features_multi_written=1;
+      }
+      next;
+    }
+    if (in_agents && match(t, /^max_threads[[:space:]]*=/)) {
+      if (!agents_max_threads_written) {
+        print "max_threads = 15";
+        agents_max_threads_written=1;
+      }
+      next;
+    }
+
+    if (in_fixer && match(t, /^description[[:space:]]*=/)) {
+      if (!fixer_desc_written) { print "description = \"bug fixer\""; fixer_desc_written=1; }
+      next;
+    }
+    if (in_fixer && match(t, /^model_reasoning_effort[[:space:]]*=/)) {
+      if (!fixer_reasoning_written) { print "model_reasoning_effort = \"medium\""; fixer_reasoning_written=1; }
+      next;
+    }
+    if (in_fixer && match(t, /^config_file[[:space:]]*=/)) {
+      if (!fixer_cfg_written) { print "config_file = \"~/.codex/agents/fixer.toml\""; fixer_cfg_written=1; }
+      next;
+    }
+
+    if (in_orch && match(t, /^description[[:space:]]*=/)) {
+      if (!orch_desc_written) { print "description = \"orchestrator\""; orch_desc_written=1; }
+      next;
+    }
+    if (in_orch && match(t, /^config_file[[:space:]]*=/)) {
+      if (!orch_cfg_written) { print "config_file = \"~/.codex/agents/orchestrator.toml\""; orch_cfg_written=1; }
+      next;
+    }
+
+    if (in_reviewer && match(t, /^description[[:space:]]*=/)) {
+      if (!reviewer_desc_written) { print "description = \"reviewer\""; reviewer_desc_written=1; }
+      next;
+    }
+    if (in_reviewer && match(t, /^config_file[[:space:]]*=/)) {
+      if (!reviewer_cfg_written) { print "config_file = \"~/.codex/agents/reviewer.toml\""; reviewer_cfg_written=1; }
+      next;
+    }
+
+    if (in_spark && match(t, /^description[[:space:]]*=/)) {
+      if (!spark_desc_written) { print "description = \"spark\""; spark_desc_written=1; }
+      next;
+    }
+    if (in_spark && match(t, /^config_file[[:space:]]*=/)) {
+      if (!spark_cfg_written) { print "config_file = \"~/.codex/agents/spark.toml\""; spark_cfg_written=1; }
+      next;
+    }
+
+    print line;
+  }
+  END {
+    flush_active_section();
+
+    if (!features_emitted) {
+      print "";
+      print "[features]";
+      print "multi_agent = true";
+    }
+    if (!agents_emitted) {
+      print "";
+      print "[agents]";
+      print "max_threads = 15";
+    }
+    if (!fixer_emitted) {
+      print "";
+      print "[agents.fixer]";
+      print "description = \"bug fixer\"";
+      print "model_reasoning_effort = \"medium\"";
+      print "config_file = \"~/.codex/agents/fixer.toml\"";
+    }
+    if (!orch_emitted) {
+      print "";
+      print "[agents.orchestrator]";
+      print "description = \"orchestrator\"";
+      print "config_file = \"~/.codex/agents/orchestrator.toml\"";
+    }
+    if (!reviewer_emitted) {
+      print "";
+      print "[agents.reviewer]";
+      print "description = \"reviewer\"";
+      print "config_file = \"~/.codex/agents/reviewer.toml\"";
+    }
+    if (!spark_emitted) {
+      print "";
+      print "[agents.spark]";
+      print "description = \"spark\"";
+      print "config_file = \"~/.codex/agents/spark.toml\"";
+    }
+  }' "$cfg_file" >"$tmp_file"
+
+  mv "$tmp_file" "$cfg_file"
+}
+
+check_codex_config() {
+  local cfg_file
+  cfg_file="$CODEX_HOME/config.toml"
+  [[ -f "$cfg_file" ]] || return 1
+
+  awk '
+  BEGIN {
+    in_features=0; in_agents=0; in_fixer=0; in_orch=0; in_reviewer=0; in_spark=0;
+    ok_features=0; ok_threads=0; ok_fixer_desc=0; ok_fixer_reason=0; ok_fixer_cfg=0;
+    ok_orch_desc=0; ok_orch_cfg=0; ok_reviewer_desc=0; ok_reviewer_cfg=0; ok_spark_desc=0; ok_spark_cfg=0;
+  }
+  function trim(s) { gsub(/^[[:space:]]+|[[:space:]]+$/, "", s); return s }
+  {
+    line=trim($0);
+    sub(/[[:space:]]+#.*$/, "", line);
+    if (line ~ /^\[[^]]+\]$/) {
+      in_features=(line=="[features]");
+      in_agents=(line=="[agents]");
+      in_fixer=(line=="[agents.fixer]");
+      in_orch=(line=="[agents.orchestrator]");
+      in_reviewer=(line=="[agents.reviewer]");
+      in_spark=(line=="[agents.spark]");
+      next;
+    }
+    if (in_features && line ~ /^multi_agent[[:space:]]*=[[:space:]]*true$/) ok_features=1;
+    if (in_agents && line ~ /^max_threads[[:space:]]*=[[:space:]]*15$/) ok_threads=1;
+    if (in_fixer && line ~ /^description[[:space:]]*=[[:space:]]*"bug fixer"$/) ok_fixer_desc=1;
+    if (in_fixer && line ~ /^model_reasoning_effort[[:space:]]*=[[:space:]]*"medium"$/) ok_fixer_reason=1;
+    if (in_fixer && line ~ /^config_file[[:space:]]*=[[:space:]]*"~\/\.codex\/agents\/fixer\.toml"$/) ok_fixer_cfg=1;
+    if (in_orch && line ~ /^description[[:space:]]*=[[:space:]]*"orchestrator"$/) ok_orch_desc=1;
+    if (in_orch && line ~ /^config_file[[:space:]]*=[[:space:]]*"~\/\.codex\/agents\/orchestrator\.toml"$/) ok_orch_cfg=1;
+    if (in_reviewer && line ~ /^description[[:space:]]*=[[:space:]]*"reviewer"$/) ok_reviewer_desc=1;
+    if (in_reviewer && line ~ /^config_file[[:space:]]*=[[:space:]]*"~\/\.codex\/agents\/reviewer\.toml"$/) ok_reviewer_cfg=1;
+    if (in_spark && line ~ /^description[[:space:]]*=[[:space:]]*"spark"$/) ok_spark_desc=1;
+    if (in_spark && line ~ /^config_file[[:space:]]*=[[:space:]]*"~\/\.codex\/agents\/spark\.toml"$/) ok_spark_cfg=1;
+  }
+  END {
+    ok = ok_features && ok_threads &&
+         ok_fixer_desc && ok_fixer_reason && ok_fixer_cfg &&
+         ok_orch_desc && ok_orch_cfg &&
+         ok_reviewer_desc && ok_reviewer_cfg &&
+         ok_spark_desc && ok_spark_cfg;
+    exit(ok ? 0 : 1);
+  }' "$cfg_file"
+}
+
 force_dx() {
   if ! install_pnpm; then
     DX_FORCE_OK=0
@@ -287,12 +533,20 @@ run_parallel_checks() {
     fi
   ) &
 
+  (
+    if check_codex_config; then
+      write_check_file "codex_config" "1" "$CODEX_HOME/config.toml" "ok" "$dir/codex_config.res"
+    else
+      write_check_file "codex_config" "0" "$CODEX_HOME/config.toml" "config.toml 缺失或配置不符合要求" "$dir/codex_config.res"
+    fi
+  ) &
+
   wait
   LAST_CHECK_DIR="$dir"
 }
 
 all_good() {
-  local keys="python3 python_alias pnpm dx agent_browser rg multi_agent"
+  local keys="python3 python_alias pnpm dx agent_browser rg multi_agent codex_config"
   local k
   for k in $keys; do
     if ! check_ok "$k"; then
@@ -309,7 +563,7 @@ print_report() {
   printf '%-14s | %-4s | %-40s | %s\n' "检查项" "状态" "版本" "说明"
   printf '%-14s-+-%-4s-+-%-40s-+-%s\n' "--------------" "----" "----------------------------------------" "------------------------------"
 
-  local keys="python3 python_alias pnpm dx agent_browser rg multi_agent"
+  local keys="python3 python_alias pnpm dx agent_browser rg multi_agent codex_config"
   local k ok txt ver msg
   for k in $keys; do
     ok="$(read_field "$k" 2)"
@@ -366,6 +620,11 @@ for round in $(seq 1 "$MAX_ROUNDS"); do
   if ! check_ok "multi_agent"; then
     echo "[doctor] 修正 multi_agent 特性开关"
     ensure_multi_agent || true
+  fi
+
+  if ! check_ok "codex_config"; then
+    echo "[doctor] 修正 ~/.codex/config.toml 关键配置"
+    ensure_codex_config || true
   fi
 
   echo "[doctor] 强制执行 dx 安装与初始化"

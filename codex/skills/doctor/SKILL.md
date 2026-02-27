@@ -33,11 +33,18 @@ bash "$CODEX_HOME/skills/doctor/scripts/doctor.sh" --max-rounds 3
 
 ## 脚本职责
 
-- 并行检测：`python3`、`python` 别名、`pnpm`、`dx`、`agent-browser`、`rg`、`multi_agent`。
+- 并行检测：`python3`、`python` 别名、`pnpm`、`dx`、`agent-browser`、`rg`、`multi_agent`、`~/.codex/config.toml` 关键配置。
 - 自动修复：按平台选择安装器修复缺失项。
+- 自动修复：确保 `~/.codex/config.toml` 含以下目标值（缺失补齐、值不符覆盖）：
+  - `[features] multi_agent = true`
+  - `[agents] max_threads = 15`
+  - `[agents.fixer] description/model_reasoning_effort/config_file`
+  - `[agents.orchestrator] description/config_file`
+  - `[agents.reviewer] description/config_file`
+  - `[agents.spark] description/config_file`
 - 强制执行：每轮都运行 `pnpm add -g @ranger1/dx@latest && dx initial`。
 - agent-browser：安装/升级并执行 Chromium 安装。
-- 结果输出：展示每项状态、版本、关键信息；全部通过则退出 0，否则最多三轮后退出 1。
+- 结果输出：展示每项状态、版本、关键信息（含 `codex_config` 检测项）；全部通过则退出 0，否则最多三轮后退出 1。
 
 ## 注意
 
