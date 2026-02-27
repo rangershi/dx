@@ -49,14 +49,10 @@ description: pr 审查
 
 处理规则：
 
-- 若返回 `{"error":"..."}`：按“错误分级与重试”处理。
 - 若返回 `{"ok":true}`：进入下一阶段。
-- 若返回 `{"ok":false,"fixFile":"..."}`：
-  - 必须调用 `fixer` 处理该 `fixFile`。
-  - 然后重跑 precheck。
-  - 最多修复 2 次；若仍不通过，终止并返回 `PRECHECK_NOT_CLEAN_AFTER_FIX`。
+- 若返回 `{"error":"..."}`：立即终止流程，不重试；直接透传 precheck 的简短失败原因（可附带 `fixFile`）。
 
-说明：预检失败修复也必须记录到 decision-log（可使用 `file: __precheck__`）。
+说明：阶段 0 是强 gate，不允许修复后重跑，也不进入“错误分级与重试”。
 
 
 ## Step 1: 生成上下文（串行）
@@ -169,13 +165,14 @@ final-report 由 `aggregator` 调用脚本发布，且幂等。
 1. 可重试错误：先重试再决定终止。
 2. 不可恢复错误：立即终止。
 
+例外：阶段 0（预检 gate）不适用本节重试策略；除 `ok:true` 外，其余返回（含任意 `error`）都必须立即终止。
+
 ### 可重试错误（建议最多 2 次重试，合计最多 3 次尝试）
 
 - `GH_PR_COMMENT_FAILED`
 - `HARVEST_FAILED`
 - `AGGREGATE_SCRIPT_FAILED`
 - `PR_CONTEXT_SCRIPT_FAILED`
-- `PR_PRECHECK_AGENT_FAILED`
 - `GIT_PUSH_FAILED_NETWORK`
 - 其他明显网络抖动/平台瞬时错误（例如 gh API 超时）
 
