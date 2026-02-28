@@ -102,7 +102,7 @@ description: pr 审查
 --prompt： `${CODEX_HOME:-$HOME/.codex}/skills/pr-review-loop/references/agents/pr-review-aggregate.md`
 --others： `contextFile + 1..n reviewFile + runId (+ decisionLogFile) + 模式 A`。
 
-- 输出 `{"stop":true}`：本轮结束并退出循环。
+- 输出 `{"stop":true}`：进入 Step 7 本轮结束退出循环。
 - 输出 `{"stop":false,"fixFile":"..."}`：进入 Step 4。
 - 输出 `{"error":"GH_PR_COMMENT_FAILED"}`：按可重试错误处理，优先重试本步骤（脚本幂等，重复调用安全）。
 - 其他 `{"error":"..."}`：按“错误分级与重试”处理。
