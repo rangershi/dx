@@ -67,7 +67,7 @@ install_python3() {
 }
 
 ensure_python_alias() {
-  local py3 py3_dir target_dir target
+  local py3 target_dir target py_major
   py3="$(command -v python3 || true)"
   if [[ -z "$py3" ]]; then
     echo "python3 不存在，无法创建 python 别名" >&2
@@ -75,29 +75,24 @@ ensure_python_alias() {
   fi
 
   if command -v python >/dev/null 2>&1; then
-    return 0
+    py_major="$(python -c 'import sys; print(sys.version_info[0])' 2>/dev/null || true)"
+    if [[ "$py_major" == "3" ]]; then
+      return 0
+    fi
   fi
 
-  py3_dir="$(dirname "$py3")"
-  if [[ -w "$py3_dir" ]]; then
-    target_dir="$py3_dir"
-  elif [[ -w "/usr/local/bin" ]]; then
-    target_dir="/usr/local/bin"
-  elif [[ -w "/opt/homebrew/bin" ]]; then
-    target_dir="/opt/homebrew/bin"
-  else
-    target_dir="$HOME/.local/bin"
-    mkdir -p "$target_dir"
-  fi
-
+  # 避免污染系统/工具链目录，统一落到用户态目录。
+  target_dir="$HOME/.local/bin"
+  mkdir -p "$target_dir"
   target="$target_dir/python"
   ln -sf "$py3" "$target"
 
-  if [[ "$target_dir" == "$HOME/.local/bin" ]]; then
+  if [[ ":$PATH:" != *":$HOME/.local/bin:"* ]]; then
     export PATH="$HOME/.local/bin:$PATH"
   fi
 
-  command -v python >/dev/null 2>&1
+  py_major="$(python -c 'import sys; print(sys.version_info[0])' 2>/dev/null || true)"
+  [[ "$py_major" == "3" ]]
 }
 
 install_rg() {
@@ -142,10 +137,11 @@ install_pnpm() {
 }
 
 ensure_agent_browser() {
-  if command -v npm >/dev/null 2>&1; then
-    npm install -g agent-browser@latest
-  elif command -v pnpm >/dev/null 2>&1; then
+  # 优先使用用户态 pnpm，减少全局权限问题。
+  if command -v pnpm >/dev/null 2>&1; then
     pnpm add -g agent-browser@latest
+  elif command -v npm >/dev/null 2>&1; then
+    npm install -g agent-browser@latest
   elif command -v brew >/dev/null 2>&1; then
     brew install agent-browser
   else
@@ -154,7 +150,10 @@ ensure_agent_browser() {
   fi
 
   if ! command -v agent-browser >/dev/null 2>&1; then
-    echo "agent-browser 安装后仍不可用" >&2
+    local pnpm_bin npm_prefix
+    pnpm_bin="$(pnpm bin -g 2>/dev/null || true)"
+    npm_prefix="$(npm prefix -g 2>/dev/null || true)"
+    echo "agent-browser 安装后仍不可用，请检查 PATH（pnpm: ${pnpm_bin:-N/A}，npm: ${npm_prefix:-N/A}/bin）" >&2
     return 1
   fi
 
@@ -424,20 +423,35 @@ check_codex_config() {
 }
 
 force_dx() {
+  local pnpm_bin dx_cmd
   if ! install_pnpm; then
     DX_FORCE_OK=0
     DX_FORCE_MSG="pnpm 不可用，无法执行 dx 强制初始化"
     return 1
   fi
 
-  if pnpm add -g @ranger1/dx@latest >/dev/null 2>&1 && dx initial >/dev/null 2>&1; then
-    DX_FORCE_OK=1
-    DX_FORCE_MSG="已执行 pnpm add -g @ranger1/dx@latest && dx initial"
-    return 0
+  if pnpm add -g @ranger1/dx@latest >/dev/null 2>&1; then
+    pnpm_bin="$(pnpm bin -g 2>/dev/null || true)"
+    dx_cmd=""
+    if [[ -n "$pnpm_bin" && -x "$pnpm_bin/dx" ]]; then
+      dx_cmd="$pnpm_bin/dx"
+    elif command -v dx >/dev/null 2>&1; then
+      dx_cmd="$(command -v dx)"
+    fi
+
+    if [[ -n "$dx_cmd" ]] && "$dx_cmd" initial >/dev/null 2>&1; then
+      DX_FORCE_OK=1
+      DX_FORCE_MSG="已执行 pnpm add -g @ranger1/dx@latest && ${dx_cmd} initial"
+      return 0
+    fi
+
+    DX_FORCE_OK=0
+    DX_FORCE_MSG="dx 已安装但无法调用（请检查 PATH，pnpm bin: ${pnpm_bin:-N/A}）"
+    return 1
   fi
 
   DX_FORCE_OK=0
-  DX_FORCE_MSG="强制命令执行失败：pnpm add -g @ranger1/dx@latest && dx initial"
+  DX_FORCE_MSG="强制命令执行失败：pnpm add -g @ranger1/dx@latest"
   return 1
 }
 
@@ -476,7 +490,14 @@ run_parallel_checks() {
 
   (
     if command -v python >/dev/null 2>&1; then
-      write_check_file "python_alias" "1" "$(python --version 2>&1 | head -n1)" "ok" "$dir/python_alias.res"
+      local py_ver py_major
+      py_ver="$(python --version 2>&1 | head -n1)"
+      py_major="$(python -c 'import sys; print(sys.version_info[0])' 2>/dev/null || true)"
+      if [[ "$py_major" == "3" ]]; then
+        write_check_file "python_alias" "1" "$py_ver" "ok" "$dir/python_alias.res"
+      else
+        write_check_file "python_alias" "0" "$py_ver" "python 存在但不是 Python 3" "$dir/python_alias.res"
+      fi
     else
       write_check_file "python_alias" "0" "" "python 别名不可用" "$dir/python_alias.res"
     fi
