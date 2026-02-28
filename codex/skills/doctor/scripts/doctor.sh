@@ -136,6 +136,46 @@ install_pnpm() {
   fi
 }
 
+persist_user_local_bin_path() {
+  local line='export PATH="$HOME/.local/bin:$PATH"'
+  local rc
+  for rc in "$HOME/.zshrc" "$HOME/.bashrc" "$HOME/.profile"; do
+    if [[ -f "$rc" ]]; then
+      if ! grep -F "$line" "$rc" >/dev/null 2>&1; then
+        printf '\n%s\n' "$line" >>"$rc"
+      fi
+    fi
+  done
+}
+
+expose_dx_globally() {
+  local source_dx="$1"
+  local target_dir target_path
+
+  if [[ ! -x "$source_dx" ]]; then
+    echo "dx 源可执行文件不存在：$source_dx" >&2
+    return 1
+  fi
+
+  target_dir=""
+  if [[ -w "/usr/local/bin" ]]; then
+    target_dir="/usr/local/bin"
+  elif [[ -w "/opt/homebrew/bin" ]]; then
+    target_dir="/opt/homebrew/bin"
+  else
+    target_dir="$HOME/.local/bin"
+    mkdir -p "$target_dir"
+    if [[ ":$PATH:" != *":$HOME/.local/bin:"* ]]; then
+      export PATH="$HOME/.local/bin:$PATH"
+    fi
+    persist_user_local_bin_path
+  fi
+
+  target_path="$target_dir/dx"
+  ln -sf "$source_dx" "$target_path"
+  command -v dx >/dev/null 2>&1
+}
+
 ensure_agent_browser() {
   # 优先使用用户态 pnpm，减少全局权限问题。
   if command -v pnpm >/dev/null 2>&1; then
@@ -423,7 +463,7 @@ check_codex_config() {
 }
 
 force_dx() {
-  local pnpm_bin dx_cmd
+  local pnpm_bin dx_installed dx_cmd
   if ! install_pnpm; then
     DX_FORCE_OK=0
     DX_FORCE_MSG="pnpm 不可用，无法执行 dx 强制初始化"
@@ -432,21 +472,34 @@ force_dx() {
 
   if pnpm add -g @ranger1/dx@latest >/dev/null 2>&1; then
     pnpm_bin="$(pnpm bin -g 2>/dev/null || true)"
-    dx_cmd=""
+    dx_installed=""
     if [[ -n "$pnpm_bin" && -x "$pnpm_bin/dx" ]]; then
-      dx_cmd="$pnpm_bin/dx"
+      dx_installed="$pnpm_bin/dx"
     elif command -v dx >/dev/null 2>&1; then
-      dx_cmd="$(command -v dx)"
+      dx_installed="$(command -v dx)"
     fi
 
-    if [[ -n "$dx_cmd" ]] && "$dx_cmd" initial >/dev/null 2>&1; then
+    if [[ -z "$dx_installed" ]]; then
+      DX_FORCE_OK=0
+      DX_FORCE_MSG="dx 安装后未找到可执行文件（pnpm bin: ${pnpm_bin:-N/A}）"
+      return 1
+    fi
+
+    if ! expose_dx_globally "$dx_installed"; then
+      DX_FORCE_OK=0
+      DX_FORCE_MSG="dx 已安装但未能暴露为全局命令（pnpm bin: ${pnpm_bin:-N/A}）"
+      return 1
+    fi
+
+    dx_cmd="$(command -v dx || true)"
+    if [[ -n "$dx_cmd" ]] && dx initial >/dev/null 2>&1; then
       DX_FORCE_OK=1
-      DX_FORCE_MSG="已执行 pnpm add -g @ranger1/dx@latest && ${dx_cmd} initial"
+      DX_FORCE_MSG="已安装并暴露全局 dx（${dx_cmd}），并执行 dx initial"
       return 0
     fi
 
     DX_FORCE_OK=0
-    DX_FORCE_MSG="dx 已安装但无法调用（请检查 PATH，pnpm bin: ${pnpm_bin:-N/A}）"
+    DX_FORCE_MSG="dx 已暴露为全局命令但 dx initial 执行失败（dx: ${dx_cmd:-N/A}）"
     return 1
   fi
 
