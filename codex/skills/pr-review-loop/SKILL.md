@@ -43,6 +43,8 @@ description: pr 审查
 
 ## 阶段 0：预检 gate（必须先通过）
 
+reviewer 配置检测由 `pr-precheck` 执行，并且必须在其他预检动作之前完成。
+
 调用 `spark`，输入：
 --prompt： `${CODEX_HOME:-$HOME/.codex}/skills/pr-review-loop/references/agents/pr-precheck.md`
 --others： `PR #<PR_NUMBER> - round <1>`
@@ -69,11 +71,10 @@ description: pr 审查
 ## 阶段 2~N：最多 3 轮循环
 ### Step 2: reviewers 并行（唯一允许并行阶段）
 
-并行调用同一个 `reviewer` 角色的多个实例（提示词驱动实体），至少包含以下 3 个提示词：
+并行调用同一个 `reviewer` 角色的多个实例（提示词驱动实体），提示词来源为项目根目录：
 
-- `${CODEX_HOME:-$HOME/.codex}/skills/pr-review-loop/references/agents/security-reviewer.md`
-- `${CODEX_HOME:-$HOME/.codex}/skills/pr-review-loop/references/agents/logic-reviewer.md`
-- `${CODEX_HOME:-$HOME/.codex}/skills/pr-review-loop/references/agents/style-reviewer.md`
+- 使用阶段 0（precheck）已确认可用的 `./reviewer/*-reviewer.md` 列表，发现几个文件就并行启动几个 reviewer 实例（1..N）。
+- 每个文件中的 `ROLE_CODE = <CODE>` 用于统一命名产物和 findings 前缀。
 
 每个 reviewer 实例输入至少包含：
 
@@ -81,20 +82,18 @@ description: pr 审查
 - `round: <ROUND>`
 - `runId: <RUN_ID>` 来自 Step 1 的输出，必须透传，禁止自行生成）
 - `contextFile: ./.cache/<file>.md`
-- `reviewerPromptFile: <上述 md 之一>`
-- `reviewerPromptContent: <reviewerPromptFile 的全文>`
+- `reviewerPromptFile: ./reviewer/<name>-reviewer.md`
 - `decisionLogFile: ./.cache/decision-log-pr<PR_NUMBER>.md`（若存在）
 
 执行要求：
 
 - reviewer 必须先读取 `reviewerPromptFile`，并严格按其中规则执行。
-- 若调用框架不自动注入文件内容，orchestrator 必须显式把 `reviewerPromptContent` 一并传给 reviewer。
 - 当通用 reviewer 约束与 `reviewerPromptFile` 冲突时，以 `reviewerPromptFile` 为准。
-- `security-reviewer` 专注安全与权限边界；`logic-reviewer` 专注逻辑正确性与边界条件；`style-reviewer` 专注可维护性、可读性与工程规范；`gh-thread-reviewer` 专注外部评论采集与归一化。
+- 每个 reviewer 产物命名必须使用其 `ROLE_CODE`：`./.cache/review-<ROLE_CODE>-pr<PR_NUMBER>-r<ROUND>-<RUN_ID>.md`。
 
 每个 reviewer 实例输出：
 
-- `reviewFile: ./.cache/<file>.md`
+- `reviewFile: ./.cache/review-<ROLE_CODE>-pr<PR_NUMBER>-r<ROUND>-<RUN_ID>.md`
 
 ### Step 3: 聚合（模式 A）
 

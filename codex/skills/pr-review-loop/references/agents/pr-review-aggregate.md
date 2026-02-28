@@ -38,9 +38,9 @@ round: 1
 runId: 123-1-a1b2c3d
   contextFile: ./.cache/pr-context-pr123-r1-123-1-a1b2c3d.md
   reviewFile: ./.cache/review-SEC-pr123-r1-123-1-a1b2c3d.md
-  reviewFile: ./.cache/review-LOG-pr123-r1-123-1-a1b2c3d.md
-  reviewFile: ./.cache/review-STY-pr123-r1-123-1-a1b2c3d.md
-  reviewFile: ./.cache/review-GHR-pr123-r1-123-1-a1b2c3d.md
+  reviewFile: ./.cache/review-PERF-pr123-r1-123-1-a1b2c3d.md
+  reviewFile: ./.cache/review-MAINT-pr123-r1-123-1-a1b2c3d.md
+  reviewFile: ./.cache/review-BIZ-pr123-r1-123-1-a1b2c3d.md
 ```
 
 ## 执行方式（强制）
@@ -59,7 +59,7 @@ runId: 123-1-a1b2c3d
 注意：这行 JSON **不是你的最终输出**，它只用于生成 `--duplicate-groups-b64` 传给脚本。
 
 ```json
-{"duplicateGroups":[["SEC-001","LOG-003"],["STY-002","LOG-005","SEC-004"]]}
+{"duplicateGroups":[["PERF-001","BIZ-003"],["MAINT-002","BIZ-005","SEC-004"]]}
 ```
 
 ## 智能匹配（仅在模式 A + decision-log 存在时）
@@ -87,7 +87,7 @@ runId: 123-1-a1b2c3d
 5. 生成**一行 JSON**（不要代码块、不要解释文字、不要换行），结构如下：
 
 ```json
-{"escalationGroups":[["SEC-001"],["STY-002","LOG-005"]]}
+{"escalationGroups":[["SEC-001"],["MAINT-002","BIZ-005"]]}
 ```
 
 其中每个组表示「可以作为已 rejected 问题的升级质疑」的 finding ID 集合。若无可升级问题，输出空数组：

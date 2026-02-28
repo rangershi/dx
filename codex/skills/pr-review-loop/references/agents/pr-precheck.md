@@ -16,18 +16,24 @@
 
 ## 预检流程（按顺序执行）
 
-1. 参数校验
+1. reviewer 配置校验（强制，先于其他所有检测）
+- 项目根目录必须存在 `./reviewer/` 目录。
+- `./reviewer/` 下必须至少有一个 `*-reviewer.md` 文件。
+- 每个 `*-reviewer.md` 文件都必须包含 `ROLE_CODE = <CODE>`（例如 `ROLE_CODE = STY`）。
+- 若上述任一条件不满足，立即终止并返回：`{"error":"REVIEWER_CONFIG_INVALID","detail":"..."}`。
+
+2. 参数校验
 - `PR_NUMBER` 必须是正整数；`round` 必须是 `>=1` 的整数。
 - 参数非法时返回：`{"error":"INVALID_ARGS"}`（可附带 `prNumber`、`round`）。
 
-2. 工作区干净校验（强制）
+3. 工作区干净校验（强制）
 - 先校验是否在 git 仓库：`git rev-parse --is-inside-work-tree`。
 - 非 git 仓库时返回：`{"error":"NOT_A_GIT_REPO"}`。
 - 执行：`git status --porcelain`。
 - 若存在未提交变更（包含 staged/unstaged/untracked），直接返回：
 - `{"error":"UNCOMMITTED_CHANGES_PRESENT","detail":"请先处理当前仓库全部未提交代码后再执行 precheck"}`。
 
-3. 切换到 PR 分支并与远程同步（优先自愈）
+4. 切换到 PR 分支并与远程同步（优先自愈）
 - 先从输入文本解析出实际 PR 编号（例如从 `PR #2884` 解析得到 `2884`），记为 `prNumber`。
 - 所有命令中的 `<PR_NUMBER>` 都表示占位符，必须替换为真实数字后再执行，禁止原样执行字面量 `gh pr checkout <PR_NUMBER>`。
 - 首选执行：使用gh 命令获取 PR 相关信息并切换到对应分支
@@ -46,16 +52,16 @@
 - checkout 失败：`{"error":"PR_CHECKOUT_FAILED"}`。
 - 与远程同步失败：`{"error":"PR_SYNC_FAILED"}`。
 
-4. 清理缓存目录（强制）
+5. 清理缓存目录（强制）
 - 清理 `./.cache/` 下所有历史文件（保留目录本身），推荐：
 - `mkdir -p ./.cache && find ./.cache -mindepth 1 -delete`
 - 清理失败返回：`{"error":"CACHE_CLEAN_FAILED"}`。
 
-5. 读取 PR 元信息（含 SSH 降级）
+6. 读取 PR 元信息（含 SSH 降级）
 - 首选执行：
   - `gh pr view <PR_NUMBER> --json headRefName,baseRefName,mergeable,headRefOid`
 - 若 `gh` 可用，必须提取：`headRefName`、`baseRefName`、`mergeable`、`headRefOid`。
-- 若 `gh` 因认证失败不可用，但第 3 步已完成 SSH 自愈，则使用 git 回填字段：
+- 若 `gh` 因认证失败不可用，但第 4 步已完成 SSH 自愈，则使用 git 回填字段：
   - `headRefName`：`git rev-parse --abbrev-ref HEAD`
   - `headRefOid`：`git rev-parse HEAD`
   - `baseRefName`：`git symbolic-ref --short refs/remotes/origin/HEAD | sed 's#^origin/##'`
@@ -63,12 +69,12 @@
 - 若 `headRefOid` 缺失：返回 `{"error":"PR_HEAD_OID_NOT_FOUND"}`。
 - 若主路径与降级路径都无法获取有效元信息：返回 `{"error":"PR_NOT_FOUND_OR_NO_ACCESS"}`。
 
-6. 生成 runId（强制）
+7. 生成 runId（强制）
 - `headShort = headRefOid[:7]`
 - `runId = <PR_NUMBER>-<round>-<headShort>`
 - 后续输出中的 `runId/headOid/headShort` 必须与此一致，禁止重算为其他值。
 
-7. 校验 base 信息并抓取远程基线
+8. 校验 base 信息并抓取远程基线
 - 若 `baseRefName` 为空，尝试：
   - `gh repo view --json defaultBranchRef --jq .defaultBranchRef.name`
 - 若仍为空，且已走 SSH 降级路径，尝试：
@@ -76,14 +82,14 @@
 - 仍为空返回：`{"error":"PR_BASE_REF_NOT_FOUND"}`。
 - 执行：`git fetch origin <baseRefName>`；失败返回：`{"error":"PR_BASE_REF_FETCH_FAILED"}`。
 
-8. 合并冲突 gate
+9. 合并冲突 gate
 - 若 `mergeable == "CONFLICTING"`，直接返回：`{"error":"PR_MERGE_CONFLICTS_UNRESOLVED"}`。
 - 若 `mergeable == "UNKNOWN"`（SSH 降级路径），必须通过试合并判定：
   - `git merge --no-ff --no-commit origin/<baseRefName>`
   - 若出现冲突：`git merge --abort` 后返回 `{"error":"PR_MERGE_CONFLICTS_UNRESOLVED"}`。
   - 若无冲突：`git merge --abort`，继续下一步。
 
-9. 质量 gate（预检核心）
+10. 质量 gate（预检核心）
 - 创建日志文件（都放 `./.cache/`）：
   - `precheck-<runId>-build.log`
   - `precheck-<runId>-meta.json`
