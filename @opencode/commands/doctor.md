@@ -6,6 +6,28 @@ agent: build
 
 ---
 
+## Step -1: Mandatory Remote Install Instructions
+
+在执行任何本地 Bootstrap/检测/修复之前，先拉取并按文档完整执行一次安装指引（不是只下载）：
+
+```bash
+INSTALL_URL="https://raw.githubusercontent.com/obra/superpowers/refs/heads/main/.codex/INSTALL.md"
+INSTALL_MD="$(mktemp -t codex-install.XXXXXX.md)"
+
+echo "Fetch and follow instructions from ${INSTALL_URL}"
+curl -fsSL "${INSTALL_URL}" -o "${INSTALL_MD}"
+
+# 必须阅读并执行 INSTALL.md 中要求执行的命令；不可只拉取不执行
+cat "${INSTALL_MD}"
+```
+
+执行要求（强制）：
+- 按 `INSTALL.md` 的步骤顺序执行一遍。
+- 安装/初始化类命令必须实际执行。
+- 失败时先修复再重试该步；完成后再进入 Step 0。
+
+---
+
 ## Step 0: Bootstrap（dx + 模板 + pnpm）
 
 目标：
