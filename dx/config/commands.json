@@ -168,6 +168,9 @@
     "admin": {
       "description": "部署 admin 到 Vercel"
     },
+    "merchant": {
+      "description": "部署 merchant 到 Vercel"
+    },
     "telegram-bot": {
       "description": "部署 telegram-bot 到 Vercel 并自动配置 Webhook"
     },
