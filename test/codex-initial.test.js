@@ -3,16 +3,16 @@ import { mkdtempSync, writeFileSync, rmSync, mkdirSync, readFileSync, existsSync
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 
-import { runOpenCodeInitial } from '../lib/opencode-initial.js'
+import { runCodexInitial } from '../lib/codex-initial.js'
 import { logger } from '../lib/logger.js'
 
-describe('runOpenCodeInitial', () => {
+describe('runCodexInitial', () => {
   let tempDir
   let packageRoot
   let homeDir
 
   beforeEach(() => {
-    tempDir = mkdtempSync(join(tmpdir(), 'dx-opencode-initial-'))
+    tempDir = mkdtempSync(join(tmpdir(), 'dx-codex-initial-'))
     packageRoot = join(tempDir, 'pkg')
     homeDir = join(tempDir, 'home')
 
@@ -29,11 +29,6 @@ describe('runOpenCodeInitial', () => {
   })
 
 test('copies codex skills and agents into ~/.codex with merge-overwrite semantics', async () => {
-    mkdirSync(join(packageRoot, '@opencode/agents'), { recursive: true })
-    mkdirSync(join(packageRoot, '@opencode/commands'), { recursive: true })
-    writeFileSync(join(packageRoot, '@opencode/agents/a.md'), '# agent')
-    writeFileSync(join(packageRoot, '@opencode/commands/c.md'), '# command')
-
     mkdirSync(join(packageRoot, 'codex/skills/skill-a/references'), { recursive: true })
     mkdirSync(join(packageRoot, 'codex/skills/skill-b/agents'), { recursive: true })
     mkdirSync(join(packageRoot, 'codex/agents/reviewer/prompts'), { recursive: true })
@@ -57,7 +52,7 @@ test('copies codex skills and agents into ~/.codex with merge-overwrite semantic
     writeFileSync(join(homeDir, '.codex/agents/reviewer/prompts/keep.md'), 'keep reviewer prompt')
     writeFileSync(join(homeDir, '.codex/agents/existing-only/SYSTEM.md'), '# existing-only agent')
 
-    await runOpenCodeInitial({ packageRoot, homeDir })
+    await runCodexInitial({ packageRoot, homeDir })
 
     expect(readFileSync(join(homeDir, '.codex/skills/skill-a/SKILL.md'), 'utf8')).toBe('# new skill a')
     expect(readFileSync(join(homeDir, '.codex/skills/skill-a/config.yaml'), 'utf8')).toBe('k: new')
@@ -76,12 +71,7 @@ test('copies codex skills and agents into ~/.codex with merge-overwrite semantic
   })
 
   test('throws when codex skills directory is missing', async () => {
-    mkdirSync(join(packageRoot, '@opencode/agents'), { recursive: true })
-    mkdirSync(join(packageRoot, '@opencode/commands'), { recursive: true })
-    writeFileSync(join(packageRoot, '@opencode/agents/a.md'), '# agent')
-    writeFileSync(join(packageRoot, '@opencode/commands/c.md'), '# command')
-
-    await expect(runOpenCodeInitial({ packageRoot, homeDir })).rejects.toThrow('模板目录 codex/skills')
+    await expect(runCodexInitial({ packageRoot, homeDir })).rejects.toThrow('模板目录 codex/skills')
 
     expect(existsSync(join(homeDir, '.codex/skills'))).toBe(false)
   })
