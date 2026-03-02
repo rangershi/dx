@@ -117,13 +117,13 @@ async function main() {
 
   if (isInitialInvocation(rawArgs)) {
     const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..')
-    const [{ logger }, { runOpenCodeInitial }] = await Promise.all([
+    const [{ logger }, { runCodexInitial }] = await Promise.all([
       import('../lib/logger.js'),
-      import('../lib/opencode-initial.js'),
+      import('../lib/codex-initial.js'),
     ])
 
     try {
-      await runOpenCodeInitial({ packageRoot })
+      await runCodexInitial({ packageRoot })
       return
     } catch (error) {
       logger.error('initial 执行失败')
