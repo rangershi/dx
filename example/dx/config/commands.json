@@ -16,6 +16,19 @@
       "concurrent": true,
       "commands": ["start.backend", "start.front"],
       "description": "并发启动 backend/front"
+    },
+    "stack": {
+      "internal": "pm2-stack",
+      "interactive": true,
+      "description": "PM2 交互式服务栈示例",
+      "stack": {
+        "ecosystemConfig": "ecosystem.config.cjs",
+        "services": ["backend", "front"],
+        "preflight": {
+          "killPorts": [3000, 3001],
+          "pm2Reset": true
+        }
+      }
     }
   },
   "build": {

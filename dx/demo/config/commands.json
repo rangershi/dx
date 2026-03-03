@@ -39,7 +39,7 @@
     "stack": {
       "internal": "pm2-stack",
       "interactive": true,
-      "description": "PM2 交互式服务栈（ai-monorepo demo）",
+      "description": "PM2 交互式服务栈（demo）",
       "stack": {
         "ecosystemConfig": "ecosystem.config.cjs",
         "pm2Bin": "pnpm pm2",

@@ -26,7 +26,7 @@
 在本仓库根目录执行：
 
 ```bash
-node ./bin/dx.js --config-dir ./dx/demo/ai-monorepo/config --help
+node ./bin/dx.js --config-dir ./dx/demo/config --help
 ```
 
 快速试跑建议：

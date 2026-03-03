@@ -182,6 +182,7 @@ dx 的命令由 `dx/config/commands.json` 驱动，并且内置了一些 interna
 - `internal: sdk-build`：SDK 生成/构建
 - `internal: backend-package`：后端打包
 - `internal: start-dev`：开发环境一键启动
+- `internal: pm2-stack`：PM2 交互式服务栈（支持端口清理/缓存清理配置）
 
 常用示例：
 
@@ -197,6 +198,76 @@ dx deploy front --staging
 dx lint
 dx test e2e backend
 ```
+
+### `dx start stack` 配置详解（PM2 交互式服务栈）
+
+从 `0.1.78` 起，`dx start stack` 推荐完全由 `dx/config/commands.json` 配置驱动，不再依赖硬编码服务列表。
+
+最小可用配置：
+
+```json
+{
+  "start": {
+    "stack": {
+      "internal": "pm2-stack",
+      "interactive": true,
+      "description": "PM2 交互式服务栈",
+      "stack": {
+        "ecosystemConfig": "ecosystem.config.cjs",
+        "services": ["backend", "front", "admin"],
+        "preflight": {
+          "killPorts": [3000, 3001, 3500],
+          "pm2Reset": true
+        }
+      }
+    }
+  }
+}
+```
+
+完整字段说明：
+
+- `start.stack.internal`
+  - 固定为 `pm2-stack`，表示启用内置 PM2 交互式 runner。
+- `start.stack.interactive`
+  - 建议设为 `true`，用于标记这是交互式命令（便于团队识别）。
+- `start.stack.stack.ecosystemConfig`
+  - PM2 配置文件路径；支持相对路径（相对项目根目录）或绝对路径。
+  - 默认值：`ecosystem.config.cjs`。
+- `start.stack.stack.pm2Bin`
+  - PM2 命令前缀，默认 `pnpm pm2`。如果团队使用全局 pm2，可改为 `pm2`。
+- `start.stack.stack.services`
+  - 交互命令（`r/l/s`）可操作的服务名单。
+  - 示例：`["backend", "front", "admin"]`。
+- `start.stack.stack.preflight.killPorts`
+  - 启动前自动清理占用端口列表。
+  - 这就是“某些端口被占用时自动处理”的核心配置。
+- `start.stack.stack.preflight.forcePortCleanup`
+  - 是否强制清理端口占用，默认 `true`。
+- `start.stack.stack.preflight.pm2Reset`
+  - 启动前是否执行 PM2 状态重置（`delete all` / `kill` / 状态文件清理），默认 `true`。
+- `start.stack.stack.preflight.cleanPaths`
+  - 启动前需要删除的缓存路径列表（相对项目根目录）。
+  - 适合清理 `.next`、`dist`、`.vite` 等缓存，避免脏状态。
+- `start.stack.stack.preflight.cleanTsBuildInfo`
+  - 是否清理 `*.tsbuildinfo`，默认 `true`。
+- `start.stack.stack.preflight.cleanTsBuildInfoDirs`
+  - 扫描 `*.tsbuildinfo` 的目录列表。
+
+交互命令保持不变：
+
+- `r <service>` 重启服务
+- `l <service>` 查看日志
+- `s <service>` 停止服务
+- `list` 查看状态
+- `monit` 打开 PM2 监控
+- `q` 停止所有服务并退出
+
+推荐实践：
+
+- 将 `services` 与 `ecosystem.config.cjs` 里的 app 名保持一致，避免交互命令找不到服务。
+- `killPorts` 只配置开发态常驻端口，避免误杀不相关进程。
+- 如果项目不是 `apps/front` / `apps/admin-front` 结构，请按实际目录改 `cleanPaths` 与 `cleanTsBuildInfoDirs`。
 
 ## deploy 行为说明
 
