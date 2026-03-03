@@ -1,0 +1,5 @@
+{
+  "development": [".env.development", ".env.development.local"],
+  "staging": [".env.staging", ".env.staging.local"],
+  "production": [".env.production", ".env.production.local"]
+}

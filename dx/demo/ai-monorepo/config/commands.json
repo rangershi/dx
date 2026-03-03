@@ -1,0 +1,141 @@
+{
+  "start": {
+    "backend": {
+      "dev": {
+        "command": "npx nx dev backend",
+        "app": "backend",
+        "ports": [3000],
+        "description": "启动后端开发服务"
+      },
+      "prod": {
+        "command": "npx nx start backend",
+        "app": "backend",
+        "description": "启动后端生产服务"
+      }
+    },
+    "front": {
+      "dev": {
+        "command": "npx nx dev front",
+        "app": "front",
+        "ports": [3001],
+        "description": "启动前端开发服务"
+      }
+    },
+    "admin": {
+      "dev": {
+        "command": "npx nx dev admin-front",
+        "app": "admin-front",
+        "ports": [3500],
+        "description": "启动管理后台开发服务"
+      }
+    },
+    "all": {
+      "dev": {
+        "concurrent": true,
+        "commands": ["start.backend.dev", "start.front.dev", "start.admin.dev"],
+        "description": "并发启动 backend/front/admin"
+      }
+    },
+    "stack": {
+      "internal": "pm2-stack",
+      "interactive": true,
+      "description": "PM2 交互式服务栈（ai-monorepo demo）",
+      "stack": {
+        "ecosystemConfig": "ecosystem.config.cjs",
+        "pm2Bin": "pnpm pm2",
+        "services": ["backend", "front", "admin"],
+        "preflight": {
+          "pm2Reset": true,
+          "killPorts": [3000, 3001, 3500],
+          "forcePortCleanup": true,
+          "cleanPaths": [
+            "apps/front/.next",
+            "dist/front",
+            "apps/admin-front/node_modules/.vite",
+            "dist/admin-front"
+          ],
+          "cleanTsBuildInfo": true,
+          "cleanTsBuildInfoDirs": ["apps/front", "apps/admin-front"]
+        }
+      }
+    }
+  },
+  "build": {
+    "backend": {
+      "dev": {
+        "command": "npx nx build backend --configuration=development",
+        "app": "backend",
+        "description": "构建后端(开发环境)"
+      },
+      "prod": {
+        "command": "npx nx build backend --configuration=production",
+        "app": "backend",
+        "description": "构建后端(生产环境)"
+      }
+    },
+    "front": {
+      "dev": {
+        "command": "npx nx build front --configuration=development",
+        "app": "front",
+        "description": "构建前端(开发环境)"
+      },
+      "prod": {
+        "command": "npx nx run front:exportDist",
+        "app": "front",
+        "description": "构建前端(生产环境)"
+      }
+    },
+    "all": {
+      "dev": {
+        "concurrent": true,
+        "commands": ["build.backend.dev", "build.front.dev"],
+        "description": "并发构建 backend/front(开发环境)"
+      },
+      "prod": {
+        "concurrent": true,
+        "commands": ["build.backend.prod", "build.front.prod"],
+        "description": "并发构建 backend/front(生产环境)"
+      }
+    }
+  },
+  "db": {
+    "generate": {
+      "command": "npx nx prisma:generate backend",
+      "app": "backend",
+      "description": "生成 Prisma Client"
+    },
+    "migrate": {
+      "dev": {
+        "command": "npx nx prisma:migrate:dev backend",
+        "app": "backend",
+        "description": "创建迁移(开发环境)"
+      },
+      "prod": {
+        "command": "npx nx prisma:migrate:deploy backend",
+        "app": "backend",
+        "dangerous": true,
+        "description": "应用迁移(生产环境)"
+      }
+    }
+  },
+  "deploy": {
+    "front": {
+      "description": "部署 front 到 Vercel"
+    },
+    "admin": {
+      "description": "部署 admin 到 Vercel"
+    },
+    "telegram-bot": {
+      "description": "部署 telegram-bot 到 Vercel"
+    }
+  },
+  "lint": {
+    "command": "npx nx run-many -t lint",
+    "description": "运行代码检查",
+    "skipEnvValidation": true
+  },
+  "install": {
+    "command": "pnpm install --frozen-lockfile",
+    "description": "安装依赖"
+  }
+}
