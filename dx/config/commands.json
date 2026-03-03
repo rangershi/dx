@@ -328,6 +328,31 @@
       "description": "启动完整开发环境（集成start-dev.sh功能）",
       "interactive": true
     },
+    "stack": {
+      "internal": "pm2-stack",
+      "interactive": true,
+      "description": "PM2 交互式服务栈（服务、端口清理、缓存清理均可配置）",
+      "stack": {
+        "ecosystemConfig": "ecosystem.config.cjs",
+        "pm2Bin": "pnpm pm2",
+        "services": ["backend", "front", "admin"],
+        "preflight": {
+          "pm2Reset": true,
+          "killPorts": [3000, 3001, 3500],
+          "forcePortCleanup": true,
+          "cleanPaths": [
+            "apps/front/.next",
+            "dist/front",
+            "apps/front/.eslintcache",
+            "apps/admin-front/node_modules/.vite",
+            "dist/admin-front",
+            "apps/admin-front/.eslintcache"
+          ],
+          "cleanTsBuildInfo": true,
+          "cleanTsBuildInfoDirs": ["apps/front", "apps/admin-front"]
+        }
+      }
+    },
     "stagewise-front": {
       "command": "npx stagewise@latest -b -s -a 3001 -p 3002 -w ./apps/front",
       "description": "Stagewise 桥接 front (3001→3002)",

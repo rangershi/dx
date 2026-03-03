@@ -1,0 +1,84 @@
+{
+  "version": 1,
+  "environments": ["development", "staging", "production"],
+
+  "layout": {
+    "forbidExact": [".env", ".env.local"],
+    "allowRoot": [".env.{env}", ".env.{env}.local"],
+    "allowSubdirGlobs": ["docker/.env*", ".vercel/.env*"]
+  },
+
+  "secretPlaceholder": "__SET_IN_env.local__",
+
+  "keys": {
+    "secret": [
+      "DATABASE_URL",
+      "JWT_SECRET",
+      "APP_SECRET",
+      "REDIS_URL",
+      "VERCEL_TOKEN"
+    ],
+    "localOnly": ["LOG_CONTEXT_FILTER"],
+    "localOverride": [
+      "LOG_LEVEL",
+      "NEXT_PUBLIC_APP_ENV",
+      "VITE_APP_ENV",
+      "VERCEL_ORG_ID",
+      "VERCEL_PROJECT_ID_FRONT",
+      "VERCEL_PROJECT_ID_ADMIN",
+      "VERCEL_PROJECT_ID_TELEGRAM_BOT"
+    ]
+  },
+
+  "appToTarget": {
+    "backend": "backend",
+    "front": "frontend",
+    "admin-front": "frontend",
+    "telegram-bot": "telegram-bot"
+  },
+
+  "targets": {
+    "backend": {
+      "files": {
+        "committed": ".env.{env}",
+        "local": ".env.{env}.local"
+      },
+      "required": {
+        "_common": [
+          "APP_ENV",
+          "DATABASE_URL",
+          "JWT_SECRET",
+          "APP_SECRET",
+          "LOG_LEVEL"
+        ],
+        "development": [],
+        "staging": [],
+        "production": []
+      }
+    },
+    "frontend": {
+      "files": {
+        "committed": ".env.{env}",
+        "local": ".env.{env}.local"
+      },
+      "required": {
+        "_common": ["NEXT_PUBLIC_APP_ENV", "VITE_APP_ENV"],
+        "development": [],
+        "staging": [],
+        "production": []
+      }
+    },
+    "telegram-bot": {
+      "files": {
+        "committed": ".env.{env}",
+        "local": ".env.{env}.local"
+      },
+      "required": {
+        "_common": ["APP_ENV", "TELEGRAM_BOT_TOKEN", "BACKEND_API_URL", "BACKEND_API_KEY"],
+        "development": [],
+        "staging": [],
+        "production": []
+      }
+    }
+  }
+}
