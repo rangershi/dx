@@ -188,7 +188,7 @@ dx 的命令由 `dx/config/commands.json` 驱动，并且内置了一些 interna
 
 ```bash
 dx start backend --dev
-dx start all
+dx start all --dev
 dx build backend --prod
 dx build sdk --dev
 dx db generate
@@ -196,8 +196,16 @@ dx db migrate --dev --name init
 dx db deploy --prod -Y
 dx deploy front --staging
 dx lint
-dx test e2e backend
+dx test e2e backend apps/backend/e2e/auth
 ```
+
+命令约束摘要：
+
+- `dx test e2e backend` 必须提供文件或目录路径，禁止无路径全量执行
+- `dx db migrate` 仅允许在 `--dev` 环境创建迁移；非开发环境请使用 `dx db deploy`
+- `dx start` 未指定服务时默认是开发套件，仅允许 `--dev`
+- `dx start` 下的单层目标（如 `stagewise-front`）默认仅支持 `--dev`
+- `dx build` 显式传入环境标志时，必须是该 target 实际支持的环境
 
 ### `dx start stack` 配置详解（PM2 交互式服务栈）
 
