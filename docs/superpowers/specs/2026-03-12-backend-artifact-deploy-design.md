@@ -86,6 +86,8 @@ Primary command:
 dx deploy backend --dev|--staging|--prod
 ```
 
+If no environment flag is passed, this backend deploy runner defaults to `--dev`, matching the repository-wide `dx` convention. This is intentionally different from the current Vercel-oriented deploy implementation and will require explicit handling in implementation so existing non-backend deploy targets are not regressed.
+
 Initial optional flags:
 
 - `--build-only`: build and package locally, do not upload or deploy remotely
@@ -120,10 +122,14 @@ Example shape:
       "description": "Build, upload, and deploy backend artifact",
       "backendDeploy": {
         "build": {
-          "command": "npx nx build backend --configuration=production",
           "app": "backend",
           "distDir": "dist/backend",
-          "versionFile": "apps/backend/package.json"
+          "versionFile": "apps/backend/package.json",
+          "commands": {
+            "development": "npx nx build backend --configuration=development",
+            "staging": "npx nx build backend --configuration=production",
+            "production": "npx nx build backend --configuration=production"
+          }
         },
         "runtime": {
           "appPackage": "apps/backend/package.json",
@@ -164,7 +170,7 @@ Example shape:
 
 Projects may configure:
 
-- local build command
+- local build command, either as one shared command or per-environment commands
 - release input paths
 - artifact output directory
 - remote host identity and base directory
@@ -181,6 +187,21 @@ Projects may not configure:
 - custom ad hoc deploy phases
 
 That boundary is intentional. The feature must stay opinionated enough that behavior is predictable across repositories.
+
+### Build Configuration Contract
+
+`build` supports two forms:
+
+- `command`: one command reused for all environments
+- `commands`: explicit per-environment commands keyed by `development`, `staging`, and `production`
+
+Resolution rules:
+
+- if `commands` is present, the selected environment key must exist and is used
+- if `commands` is absent, `command` is required and is used for all environments
+- the build command is executed through the normal `dx` command execution path so environment loading for the configured `build.app` can still apply
+
+This keeps the runner environment-aware without forcing every project to duplicate commands when `staging` and `production` share the same build.
 
 ## Standard Remote Layout
 
@@ -250,8 +271,8 @@ The bundle exists to keep transport simple while still validating the actual rel
 4. Verify the inner release archive checksum.
 5. Extract the inner release archive into `<baseDir>/releases/<version-name>`.
 6. Link remote shared environment files into the release directory:
-   - `.env.<environment>`
-   - `.env.<environment>.local`
+   - `shared/.env.<environment>` -> `<releaseDir>/.env.<environment>`
+   - `shared/.env.<environment>.local` -> `<releaseDir>/.env.<environment>.local`
 7. Check required runtime tools:
    - `node`
    - `pnpm`
@@ -285,6 +306,24 @@ Required output behavior for V1:
 
 The output contract for V1 is backend-focused and opinionated rather than fully generic. It is acceptable for the generator to support only the dependency and metadata shapes needed by the existing backend deployment model.
 
+## Prisma Execution Contract
+
+Prisma paths are resolved relative to the extracted release root on the remote host.
+
+If Prisma support is enabled:
+
+- `runtime.prismaSchemaDir` is required
+- `runtime.prismaConfig` is required
+
+Remote commands are:
+
+- generate: `./node_modules/.bin/prisma generate --schema=./<prismaSchemaDir> --config=./<prismaConfig>`
+- migrate: `./node_modules/.bin/prisma migrate deploy --schema=./<prismaSchemaDir> --config=./<prismaConfig>`
+
+These commands run inside the release root and are wrapped with the selected environment files already linked into that release.
+
+If Prisma support is disabled in deploy config, both commands are omitted.
+
 ## Startup Modes
 
 Two startup modes are supported.
@@ -310,6 +349,7 @@ Requirements:
 
 Behavior:
 
+- `startup.entry` is resolved relative to the extracted release root
 - deploy runner starts the service directly with `node <entry>` as a foreground remote process
 - the `ssh` session remains attached for the lifetime of the process
 - deploy success means the process started successfully and remains alive until the operator ends the session or the process exits
@@ -354,6 +394,9 @@ This keeps secrets outside the artifact and preserves the existing `dx` directio
 - Leave the previous `current` symlink unchanged.
 - Remove incomplete temporary extraction state.
 - Always release the remote deploy lock before exit.
+- If lock acquisition fails, deploy exits without modifying the target host.
+- If checksum verification fails, deploy exits before release extraction.
+- If the computed release directory already exists and is the current target, deploy fails rather than overwriting it.
 
 ### Remote failures after `current` switch
 
@@ -459,6 +502,121 @@ Interface:
 - output: shell command string passed to `ssh`
 
 These units are intentionally narrower than "one big deploy runner" so they can be tested independently.
+
+## Interface Contracts
+
+### Normalized backend deploy config
+
+The deploy config resolver returns a shape equivalent to:
+
+```js
+{
+  environment: 'development' | 'staging' | 'production',
+  build: {
+    app: string | null,
+    command: string,
+    distDir: string,
+    versionFile: string
+  },
+  runtime: {
+    appPackage: string,
+    rootPackage: string,
+    lockfile: string,
+    prismaSchemaDir: string | null,
+    prismaConfig: string | null,
+    ecosystemConfig: string | null
+  },
+  artifact: {
+    outputDir: string,
+    bundleName: string
+  },
+  remote: {
+    host: string,
+    port: number,
+    user: string,
+    baseDir: string
+  },
+  startup: {
+    mode: 'pm2' | 'direct',
+    serviceName: string | null,
+    entry: string | null
+  },
+  deploy: {
+    keepReleases: number,
+    installCommand: string,
+    prismaGenerate: boolean,
+    prismaMigrateDeploy: boolean,
+    skipInstall: boolean,
+    skipMigration: boolean
+  }
+}
+```
+
+### Bundle metadata
+
+The local artifact builder returns a shape equivalent to:
+
+```js
+{
+  version: string,
+  timeTag: string,
+  versionName: string,
+  bundlePath: string,
+  innerArchivePath: string,
+  checksumPath: string
+}
+```
+
+### Normalized remote deploy payload
+
+The remote transport and command builder use a shape equivalent to:
+
+```js
+{
+  environment: 'development' | 'staging' | 'production',
+  versionName: string,
+  uploadedBundlePath: string,
+  remote: {
+    host: string,
+    port: number,
+    user: string,
+    baseDir: string
+  },
+  runtime: {
+    prismaSchemaDir: string | null,
+    prismaConfig: string | null,
+    ecosystemConfig: string | null
+  },
+  startup: {
+    mode: 'pm2' | 'direct',
+    serviceName: string | null,
+    entry: string | null
+  },
+  deploy: {
+    keepReleases: number,
+    installCommand: string,
+    prismaGenerate: boolean,
+    prismaMigrateDeploy: boolean,
+    skipInstall: boolean,
+    skipMigration: boolean
+  }
+}
+```
+
+### Failure model
+
+The remote deploy executor should surface structured failure information to the CLI layer, with at least:
+
+```js
+{
+  phase: 'build' | 'package' | 'upload' | 'lock' | 'extract' | 'env' | 'install' | 'prisma-generate' | 'prisma-migrate' | 'switch-current' | 'startup' | 'cleanup',
+  message: string,
+  rollbackAttempted: boolean,
+  rollbackSucceeded: boolean | null
+}
+```
+
+This contract is for implementation planning and testability. The CLI may still render the result as user-facing logs.
 
 ## Compatibility
 
