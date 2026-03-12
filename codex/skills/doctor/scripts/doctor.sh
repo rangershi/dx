@@ -233,7 +233,7 @@ ensure_codex_config() {
     in_features=0; in_agents=0; in_fixer=0; in_orch=0; in_reviewer=0; in_spark=0;
     features_emitted=0; agents_emitted=0; fixer_emitted=0; orch_emitted=0; reviewer_emitted=0; spark_emitted=0;
     features_multi_written=0; agents_max_threads_written=0;
-    fixer_desc_written=0; fixer_reasoning_written=0; fixer_cfg_written=0;
+    fixer_desc_written=0; fixer_cfg_written=0;
     orch_desc_written=0; orch_cfg_written=0;
     reviewer_desc_written=0; reviewer_cfg_written=0;
     spark_desc_written=0; spark_cfg_written=0;
@@ -252,24 +252,23 @@ ensure_codex_config() {
   }
   function flush_fixer() {
     if (!fixer_emitted) return;
-    if (!fixer_desc_written) print "description = \"bug fixer\"";
-    if (!fixer_reasoning_written) print "model_reasoning_effort = \"medium\"";
-    if (!fixer_cfg_written) print "config_file = \"~/.codex/agents/fixer.toml\"";
+    if (!fixer_desc_written) print "description = \"bugfix 代理\"";
+    if (!fixer_cfg_written) print "config_file = \"agents/fixer.toml\"";
   }
   function flush_orch() {
     if (!orch_emitted) return;
-    if (!orch_desc_written) print "description = \"orchestrator\"";
-    if (!orch_cfg_written) print "config_file = \"~/.codex/agents/orchestrator.toml\"";
+    if (!orch_desc_written) print "description = \"pr 修复流程编排代理\"";
+    if (!orch_cfg_written) print "config_file = \"agents/orchestrator.toml\"";
   }
   function flush_reviewer() {
     if (!reviewer_emitted) return;
-    if (!reviewer_desc_written) print "description = \"reviewer\"";
-    if (!reviewer_cfg_written) print "config_file = \"~/.codex/agents/reviewer.toml\"";
+    if (!reviewer_desc_written) print "description = \"代码评审代理\"";
+    if (!reviewer_cfg_written) print "config_file = \"agents/reviewer.toml\"";
   }
   function flush_spark() {
     if (!spark_emitted) return;
-    if (!spark_desc_written) print "description = \"spark\"";
-    if (!spark_cfg_written) print "config_file = \"~/.codex/agents/spark.toml\"";
+    if (!spark_desc_written) print "description = \"通用执行代理\"";
+    if (!spark_cfg_written) print "config_file = \"agents/spark.toml\"";
   }
   function flush_active_section() {
     if (in_features) flush_features();
@@ -332,42 +331,38 @@ ensure_codex_config() {
     }
 
     if (in_fixer && match(t, /^description[[:space:]]*=/)) {
-      if (!fixer_desc_written) { print "description = \"bug fixer\""; fixer_desc_written=1; }
-      next;
-    }
-    if (in_fixer && match(t, /^model_reasoning_effort[[:space:]]*=/)) {
-      if (!fixer_reasoning_written) { print "model_reasoning_effort = \"medium\""; fixer_reasoning_written=1; }
+      if (!fixer_desc_written) { print "description = \"bugfix 代理\""; fixer_desc_written=1; }
       next;
     }
     if (in_fixer && match(t, /^config_file[[:space:]]*=/)) {
-      if (!fixer_cfg_written) { print "config_file = \"~/.codex/agents/fixer.toml\""; fixer_cfg_written=1; }
+      if (!fixer_cfg_written) { print "config_file = \"agents/fixer.toml\""; fixer_cfg_written=1; }
       next;
     }
 
     if (in_orch && match(t, /^description[[:space:]]*=/)) {
-      if (!orch_desc_written) { print "description = \"orchestrator\""; orch_desc_written=1; }
+      if (!orch_desc_written) { print "description = \"pr 修复流程编排代理\""; orch_desc_written=1; }
       next;
     }
     if (in_orch && match(t, /^config_file[[:space:]]*=/)) {
-      if (!orch_cfg_written) { print "config_file = \"~/.codex/agents/orchestrator.toml\""; orch_cfg_written=1; }
+      if (!orch_cfg_written) { print "config_file = \"agents/orchestrator.toml\""; orch_cfg_written=1; }
       next;
     }
 
     if (in_reviewer && match(t, /^description[[:space:]]*=/)) {
-      if (!reviewer_desc_written) { print "description = \"reviewer\""; reviewer_desc_written=1; }
+      if (!reviewer_desc_written) { print "description = \"代码评审代理\""; reviewer_desc_written=1; }
       next;
     }
     if (in_reviewer && match(t, /^config_file[[:space:]]*=/)) {
-      if (!reviewer_cfg_written) { print "config_file = \"~/.codex/agents/reviewer.toml\""; reviewer_cfg_written=1; }
+      if (!reviewer_cfg_written) { print "config_file = \"agents/reviewer.toml\""; reviewer_cfg_written=1; }
       next;
     }
 
     if (in_spark && match(t, /^description[[:space:]]*=/)) {
-      if (!spark_desc_written) { print "description = \"spark\""; spark_desc_written=1; }
+      if (!spark_desc_written) { print "description = \"通用执行代理\""; spark_desc_written=1; }
       next;
     }
     if (in_spark && match(t, /^config_file[[:space:]]*=/)) {
-      if (!spark_cfg_written) { print "config_file = \"~/.codex/agents/spark.toml\""; spark_cfg_written=1; }
+      if (!spark_cfg_written) { print "config_file = \"agents/spark.toml\""; spark_cfg_written=1; }
       next;
     }
 
@@ -389,27 +384,26 @@ ensure_codex_config() {
     if (!fixer_emitted) {
       print "";
       print "[agents.fixer]";
-      print "description = \"bug fixer\"";
-      print "model_reasoning_effort = \"medium\"";
-      print "config_file = \"~/.codex/agents/fixer.toml\"";
+      print "description = \"bugfix 代理\"";
+      print "config_file = \"agents/fixer.toml\"";
     }
     if (!orch_emitted) {
       print "";
       print "[agents.orchestrator]";
-      print "description = \"orchestrator\"";
-      print "config_file = \"~/.codex/agents/orchestrator.toml\"";
+      print "description = \"pr 修复流程编排代理\"";
+      print "config_file = \"agents/orchestrator.toml\"";
     }
     if (!reviewer_emitted) {
       print "";
       print "[agents.reviewer]";
-      print "description = \"reviewer\"";
-      print "config_file = \"~/.codex/agents/reviewer.toml\"";
+      print "description = \"代码评审代理\"";
+      print "config_file = \"agents/reviewer.toml\"";
     }
     if (!spark_emitted) {
       print "";
       print "[agents.spark]";
-      print "description = \"spark\"";
-      print "config_file = \"~/.codex/agents/spark.toml\"";
+      print "description = \"通用执行代理\"";
+      print "config_file = \"agents/spark.toml\"";
     }
   }' "$cfg_file" >"$tmp_file"
 
@@ -424,7 +418,7 @@ check_codex_config() {
   awk '
   BEGIN {
     in_features=0; in_agents=0; in_fixer=0; in_orch=0; in_reviewer=0; in_spark=0;
-    ok_features=0; ok_threads=0; ok_fixer_desc=0; ok_fixer_reason=0; ok_fixer_cfg=0;
+    ok_features=0; ok_threads=0; ok_fixer_desc=0; ok_fixer_cfg=0;
     ok_orch_desc=0; ok_orch_cfg=0; ok_reviewer_desc=0; ok_reviewer_cfg=0; ok_spark_desc=0; ok_spark_cfg=0;
   }
   function trim(s) { gsub(/^[[:space:]]+|[[:space:]]+$/, "", s); return s }
@@ -442,19 +436,18 @@ check_codex_config() {
     }
     if (in_features && line ~ /^multi_agent[[:space:]]*=[[:space:]]*true$/) ok_features=1;
     if (in_agents && line ~ /^max_threads[[:space:]]*=[[:space:]]*15$/) ok_threads=1;
-    if (in_fixer && line ~ /^description[[:space:]]*=[[:space:]]*"bug fixer"$/) ok_fixer_desc=1;
-    if (in_fixer && line ~ /^model_reasoning_effort[[:space:]]*=[[:space:]]*"medium"$/) ok_fixer_reason=1;
-    if (in_fixer && line ~ /^config_file[[:space:]]*=[[:space:]]*"~\/\.codex\/agents\/fixer\.toml"$/) ok_fixer_cfg=1;
-    if (in_orch && line ~ /^description[[:space:]]*=[[:space:]]*"orchestrator"$/) ok_orch_desc=1;
-    if (in_orch && line ~ /^config_file[[:space:]]*=[[:space:]]*"~\/\.codex\/agents\/orchestrator\.toml"$/) ok_orch_cfg=1;
-    if (in_reviewer && line ~ /^description[[:space:]]*=[[:space:]]*"reviewer"$/) ok_reviewer_desc=1;
-    if (in_reviewer && line ~ /^config_file[[:space:]]*=[[:space:]]*"~\/\.codex\/agents\/reviewer\.toml"$/) ok_reviewer_cfg=1;
-    if (in_spark && line ~ /^description[[:space:]]*=[[:space:]]*"spark"$/) ok_spark_desc=1;
-    if (in_spark && line ~ /^config_file[[:space:]]*=[[:space:]]*"~\/\.codex\/agents\/spark\.toml"$/) ok_spark_cfg=1;
+    if (in_fixer && line ~ /^description[[:space:]]*=[[:space:]]*"bugfix 代理"$/) ok_fixer_desc=1;
+    if (in_fixer && line ~ /^config_file[[:space:]]*=[[:space:]]*"agents\/fixer\.toml"$/) ok_fixer_cfg=1;
+    if (in_orch && line ~ /^description[[:space:]]*=[[:space:]]*"pr 修复流程编排代理"$/) ok_orch_desc=1;
+    if (in_orch && line ~ /^config_file[[:space:]]*=[[:space:]]*"agents\/orchestrator\.toml"$/) ok_orch_cfg=1;
+    if (in_reviewer && line ~ /^description[[:space:]]*=[[:space:]]*"代码评审代理"$/) ok_reviewer_desc=1;
+    if (in_reviewer && line ~ /^config_file[[:space:]]*=[[:space:]]*"agents\/reviewer\.toml"$/) ok_reviewer_cfg=1;
+    if (in_spark && line ~ /^description[[:space:]]*=[[:space:]]*"通用执行代理"$/) ok_spark_desc=1;
+    if (in_spark && line ~ /^config_file[[:space:]]*=[[:space:]]*"agents\/spark\.toml"$/) ok_spark_cfg=1;
   }
   END {
     ok = ok_features && ok_threads &&
-         ok_fixer_desc && ok_fixer_reason && ok_fixer_cfg &&
+         ok_fixer_desc && ok_fixer_cfg &&
          ok_orch_desc && ok_orch_cfg &&
          ok_reviewer_desc && ok_reviewer_cfg &&
          ok_spark_desc && ok_spark_cfg;

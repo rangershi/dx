@@ -57,7 +57,7 @@ bash "$CODEX_HOME/skills/doctor/scripts/doctor.sh" --max-rounds 3
 - 自动修复：确保 `~/.codex/config.toml` 含以下目标值（缺失补齐、值不符覆盖）：
   - `[features] multi_agent = true`
   - `[agents] max_threads = 15`
-  - `[agents.fixer] description/model_reasoning_effort/config_file`
+  - `[agents.fixer] description/config_file`
   - `[agents.orchestrator] description/config_file`
   - `[agents.reviewer] description/config_file`
   - `[agents.spark] description/config_file`
