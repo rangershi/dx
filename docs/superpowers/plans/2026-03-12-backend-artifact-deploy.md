@@ -141,6 +141,14 @@ test.each([
 test('fails when selected environment command is missing from build.commands', () => {
   // production env with only development command should throw
 })
+
+test('rejects local paths that escape projectRoot', () => {
+  // runtime/build/artifact paths must remain inside cli.projectRoot
+})
+
+test('rejects remote.baseDir containing unsafe shell characters', () => {
+  // remote baseDir must be absolute and shell-safe
+})
 ```
 
 - [ ] **Step 2: Run tests to verify they fail**
@@ -163,6 +171,8 @@ export function resolveBackendDeployConfig({ cli, targetConfig, environment, fla
   }
 }
 ```
+
+All project-local paths must be resolved relative to `cli.projectRoot` and rejected if they escape that base. `remote.baseDir` must be validated as an absolute, shell-safe POSIX path before any SSH/SCP command is assembled.
 
 - [ ] **Step 4: Run tests to verify they pass**
 
@@ -437,6 +447,10 @@ test('surfaces missing shared env file, lock contention, and checksum mismatch',
 
 test('surfaces upload failure and missing remote tool failure', async () => {
   // scp failure, remote node/pnpm/pm2 missing
+})
+
+test('quotes remote mkdir directories to avoid shell metacharacter execution', () => {
+  // remote mkdir command must quote each derived directory path
 })
 
 test('handles startup failure before migration and after migration differently', async () => {

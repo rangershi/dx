@@ -362,6 +362,8 @@ dx deploy backend --prod --skip-migration
 
 - 生成的 release `package.json` 默认只保留运行时依赖；如果应用把 `prisma` 放在 `devDependencies`，dx 会自动把它提升进 release 依赖，保证远端 `prisma generate` / `prisma migrate deploy` 可执行。
 - 打包前会递归扫描整个 staged payload；任意层级出现 `.env*` 文件都会直接失败，避免把环境文件误打进制品。
+- 所有本地路径字段都会被解析为相对项目根目录，并且必须留在项目根目录内；例如 `build.distDir`、`runtime.prismaSchemaDir`、`artifact.outputDir` 不能通过 `../` 逃逸到仓库外。
+- `remote.baseDir` 必须是绝对路径，并且只能包含 `/`、字母、数字、`.`、`_`、`-`；不要使用空格或 shell 特殊字符。
 
 ## 依赖关系约定
 

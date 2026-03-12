@@ -523,6 +523,8 @@ Required checks:
 - reject tar entries containing `..`
 - reject suspicious symlink targets inside archives
 - validate computed release paths remain under the configured output or remote base directory
+- reject local config paths that escape project root
+- require `remote.baseDir` to be an absolute POSIX path and reject shell metacharacters before building any remote command
 - require remote deployment lock to prevent concurrent deploys
 - never copy `.env*` files into the artifact
 
@@ -682,6 +684,8 @@ Validation rule:
 
 - for full deploy, `remote.host`, `remote.user`, and `remote.baseDir` are required
 - for `--build-only`, remote config may be omitted because no upload or remote execution occurs
+- reject local config paths that escape project root
+- require `remote.baseDir` to be an absolute POSIX path containing only `/`, alphanumerics, `.`, `_`, and `-`
 
 ### Bundle metadata
 

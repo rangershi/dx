@@ -138,6 +138,8 @@ dx deploy backend --prod --skip-migration
 
 - release `package.json` 默认只带运行时依赖；如果 `prisma` 仅存在于应用 `devDependencies`，dx 会自动保留它，避免远端迁移阶段缺 CLI。
 - 打包前会递归拒绝任何层级的 `.env*` 文件进入制品。
+- 所有本地路径字段都会先约束在项目根目录内，不能通过 `../` 指向仓库外路径。
+- `remote.baseDir` 必须使用绝对路径，并且只允许 `/`、字母、数字、`.`、`_`、`-` 这些字符。
 
 ## env-layers.json 怎么写
 
