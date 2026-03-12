@@ -91,7 +91,6 @@ If no environment flag is passed, this backend deploy runner defaults to `--dev`
 Initial optional flags:
 
 - `--build-only`: build and package locally, do not upload or deploy remotely
-- `--skip-install`: remote deploy skips `pnpm install` and Prisma generate
 - `--skip-migration`: remote deploy skips `prisma migrate deploy`
 
 The default path is full end-to-end execution:
@@ -107,6 +106,8 @@ Environment flag mapping is explicit:
 - `--prod` -> `production`
 
 `--build-only` is mutually exclusive with remote deploy behavior. The first version does not include `--upload-only`; upload-without-build can be added later only after a clear bundle input contract is designed.
+
+The first version also does not include `--skip-install`. Remote deploy always installs production dependencies. This keeps Prisma and startup behavior coherent and avoids introducing a second artifact mode with prebundled `node_modules`.
 
 ## Configuration Model
 
@@ -203,6 +204,23 @@ Resolution rules:
 
 This keeps the runner environment-aware without forcing every project to duplicate commands when `staging` and `production` share the same build.
 
+### CLI Routing Contract
+
+The existing `deploy` command family remains the public entry point.
+
+Dispatch rules for implementation:
+
+- `handleDeploy` first resolves `deploy.<target>` from `commands.json`
+- if the target config contains `internal: "backend-artifact-deploy"`, dispatch to the new backend deploy runner
+- otherwise keep the existing Vercel-oriented deploy path unchanged
+
+Environment defaulting rules:
+
+- backend artifact deploy targets default to `development` when no env flag is passed
+- existing non-backend deploy targets keep their current behavior unless separately migrated
+
+This avoids breaking Vercel deploy targets while still allowing backend deploy to follow the repository-wide default-env convention.
+
 ## Standard Remote Layout
 
 The remote filesystem layout is fixed by `dx`:
@@ -244,7 +262,7 @@ The bundle exists to keep transport simple while still validating the actual rel
 3. Resolve version from `versionFile` unless explicitly overridden in the future.
 4. Run the configured local build command.
 5. Collect runtime files into a staging directory:
-   - built backend output from `distDir`
+   - copy the contents of `distDir` into the release root without flattening nested paths inside that directory
    - Prisma schema directory if configured
    - Prisma config file if configured
    - runtime `package.json` generated from app and root package data
@@ -303,8 +321,27 @@ Required output behavior for V1:
 - exclude `devDependencies`
 - include only the minimal scripts required for remote install and startup, if any are needed by the generated package contract
 - preserve package manager metadata needed for `pnpm` install on the remote host
+- if backend package dependencies contain `workspace:` or other monorepo-local package references that cannot be installed on the remote host from the generated release package alone, packaging fails explicitly
+- V1 does not rewrite or publish workspace-local dependencies automatically
+- V1 assumes deployable backend runtime dependencies are either normal registry-resolvable packages or already compiled into the built output copied from `distDir`
 
 The output contract for V1 is backend-focused and opinionated rather than fully generic. It is acceptable for the generator to support only the dependency and metadata shapes needed by the existing backend deployment model.
+
+## Release Layout Contract
+
+The extracted release root is the working directory for remote install, Prisma, and startup.
+
+Layout rules:
+
+- files copied from `distDir` keep their paths relative to `distDir`
+- Prisma files are added under the configured paths relative to the release root
+- generated `package.json` and copied lockfile are written at the release root
+- ecosystem config is written at the release root unless an absolute remote path is intentionally supported later
+
+Implication:
+
+- if `distDir` contains `apps/backend/src/main.js`, then `startup.entry` should be `apps/backend/src/main.js`
+- both `startup.entry` and Prisma paths are always resolved relative to the extracted release root
 
 ## Prisma Execution Contract
 
@@ -412,6 +449,26 @@ The no-automatic-rollback-after-migration rule is critical. Old code may no long
 
 - Missing `node`, `pnpm`, or required `pm2` fail the deploy with an explicit message.
 - The first version does not attempt installation or repair.
+
+## Validation Matrix
+
+Config resolver rules for V1:
+
+- `startup.mode=pm2`
+  - requires `startup.serviceName`
+  - requires `runtime.ecosystemConfig`
+  - ignores `startup.entry`
+- `startup.mode=direct`
+  - requires `startup.entry`
+  - ignores `startup.serviceName`
+- `deploy.prismaGenerate=true` or `deploy.prismaMigrateDeploy=true`
+  - requires `runtime.prismaSchemaDir`
+  - requires `runtime.prismaConfig`
+- `deploy.prismaGenerate=false` and `deploy.prismaMigrateDeploy=false`
+  - Prisma paths may be omitted
+- `--build-only`
+  - forbids remote execution phases
+  - `--skip-migration` is accepted but has no effect because remote execution does not run
 
 ## Security and Safety Requirements
 
@@ -546,7 +603,6 @@ The deploy config resolver returns a shape equivalent to:
     installCommand: string,
     prismaGenerate: boolean,
     prismaMigrateDeploy: boolean,
-    skipInstall: boolean,
     skipMigration: boolean
   }
 }
@@ -597,7 +653,6 @@ The remote transport and command builder use a shape equivalent to:
     installCommand: string,
     prismaGenerate: boolean,
     prismaMigrateDeploy: boolean,
-    skipInstall: boolean,
     skipMigration: boolean
   }
 }
@@ -646,6 +701,9 @@ No existing project should be forced to migrate immediately.
 - local build failure
 - upload failure
 - missing remote tool failure
+- missing shared env file failure
+- deploy lock contention
+- checksum mismatch
 - startup failure before migration
 - startup failure after migration
 
