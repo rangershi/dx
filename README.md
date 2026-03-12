@@ -358,6 +358,11 @@ dx deploy backend --prod --skip-migration
 - `<baseDir>/shared/.env.<environment>.local`
 - `<baseDir>/uploads/<bundle-file>`
 
+运行时制品约束：
+
+- 生成的 release `package.json` 默认只保留运行时依赖；如果应用把 `prisma` 放在 `devDependencies`，dx 会自动把它提升进 release 依赖，保证远端 `prisma generate` / `prisma migrate deploy` 可执行。
+- 打包前会递归扫描整个 staged payload；任意层级出现 `.env*` 文件都会直接失败，避免把环境文件误打进制品。
+
 ## 依赖关系约定
 
 dx 不负责管理「工程之间的构建依赖关系」。如果多个工程之间存在依赖（例如 `front/admin` 依赖 `shared` 或 `api-contracts`），必须由 Nx 的依赖图来表达并自动拉起：

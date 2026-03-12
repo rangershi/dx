@@ -13,6 +13,7 @@ describe('backend artifact deploy docs and example config', () => {
 
   test('README documents backend artifact deploy command and fixed remote layout', () => {
     const readme = readFileSync(new URL('../README.md', import.meta.url), 'utf8')
+    const exampleReadme = readFileSync(new URL('../example/README.md', import.meta.url), 'utf8')
 
     expect(readme).toContain('dx deploy backend --prod')
     expect(readme).toContain('--build-only')
@@ -20,5 +21,9 @@ describe('backend artifact deploy docs and example config', () => {
     expect(readme).toContain('<baseDir>/releases/<version-name>')
     expect(readme).toContain('<baseDir>/current')
     expect(readme).toContain('<baseDir>/shared/.env.<environment>')
+    expect(readme).toContain('如果应用把 `prisma` 放在 `devDependencies`')
+    expect(readme).toContain('任意层级出现 `.env*` 文件都会直接失败')
+    expect(exampleReadme).toContain('internal: "backend-artifact-deploy"')
+    expect(exampleReadme).toContain('dx deploy backend --build-only')
   })
 })

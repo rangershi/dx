@@ -200,6 +200,10 @@ test('fails on workspace dependencies that cannot be installed remotely', () => 
 test('fails on other non-installable local dependency references', () => {
   // file:, link:, workspace:^ should throw
 })
+
+test('preserves prisma cli from devDependencies for remote deploy flows', () => {
+  // prisma in devDependencies should still be present in generated runtime dependencies
+})
 ```
 
 - [ ] **Step 2: Write the failing artifact builder tests**
@@ -211,6 +215,10 @@ test('builds inner archive, checksum, and outer bundle metadata', async () => {
 
 test('fails when staged payload contains env files', async () => {
   // .env.production should reject packaging
+})
+
+test('rejects nested .env files anywhere in the staged payload', async () => {
+  // apps/backend/.env.production should also reject packaging
 })
 
 test('preserves paths relative to distDir and writes runtime files at release root', async () => {
@@ -247,7 +255,7 @@ export function createRuntimePackage({ appPackage, rootPackage }) {
     version: appPackage.version,
     private: appPackage.private,
     type: appPackage.type,
-    dependencies: appPackage.dependencies || {},
+    dependencies: mergeRuntimeDependencies(appPackage.dependencies, appPackage.devDependencies),
     packageManager: rootPackage.packageManager,
     engines: resolveEngines(rootPackage, appPackage),
   }

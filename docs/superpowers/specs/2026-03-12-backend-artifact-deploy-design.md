@@ -270,7 +270,7 @@ The bundle exists to keep transport simple while still validating the actual rel
    - runtime `package.json` generated from app and root package data
    - lockfile
    - ecosystem config for `pm2` mode if configured
-6. Assert the staged payload does not include `.env*` files.
+6. Recursively assert the staged payload does not include `.env*` files at any depth.
 7. Create the inner release archive.
 8. Write a `sha256` checksum for the inner archive.
 9. Wrap the archive plus checksum into the delivery bundle.
@@ -328,7 +328,8 @@ Required output behavior for V1:
   - `packageManager` copied from the workspace root package when present
   - `engines.node` copied from the workspace root or app package when present
 - include backend runtime `dependencies`
-- exclude `devDependencies`
+- exclude unrelated `devDependencies`
+- preserve `prisma` in the generated release dependencies even when the source app keeps it in `devDependencies`, so remote `prisma generate` / `prisma migrate deploy` still work
 - include only the minimal scripts required for remote install and startup, if any are needed by the generated package contract
 - do not include workspace-only fields that imply a full monorepo install on the remote host
 - if backend package dependencies contain `workspace:` or other monorepo-local package references that cannot be installed on the remote host from the generated release package alone, packaging fails explicitly
@@ -437,7 +438,7 @@ This keeps secrets outside the artifact and preserves the existing `dx` directio
 
 - If local build fails, stop immediately.
 - If staging or packaging fails, stop immediately.
-- If the staged payload contains `.env*`, fail before archiving.
+- If the staged payload contains `.env*` anywhere in the staged tree, fail before archiving.
 
 ### Upload failures
 
