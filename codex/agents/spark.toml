@@ -1,10 +1,7 @@
 model = "gpt-5.3-codex"
 model_reasoning_effort = "medium"
 approval_policy = "never"
-sandbox_mode = "workspace-write"
-
-[sandbox_workspace_write]
-network_access = true
+sandbox_mode = "danger-full-access"
 
 developer_instructions = '''
 你是一个通用agent 根据输入的提示词，完整遵循他的要求执行任务
@@ -19,4 +16,3 @@ developer_instructions = '''
 prompt是一个文件路径并不存在时，必须返回结构化错误：{"error":"PROMPT_FILE_NOT_FOUND","detail":"<file_path>"}
 
 '''
-

@@ -181,6 +181,7 @@ dx 的命令由 `dx/config/commands.json` 驱动，并且内置了一些 interna
 
 - `internal: sdk-build`：SDK 生成/构建
 - `internal: backend-package`：后端打包
+- `internal: backend-artifact-deploy`：后端制品构建、上传与远端部署
 - `internal: start-dev`：开发环境一键启动
 - `internal: pm2-stack`：PM2 交互式服务栈（支持端口清理/缓存清理配置）
 
@@ -195,6 +196,7 @@ dx db generate
 dx db migrate --dev --name init
 dx db deploy --prod -Y
 dx deploy front --staging
+dx deploy backend --prod
 dx lint
 dx test e2e backend apps/backend/e2e/auth
 ```
@@ -283,6 +285,83 @@ dx test e2e backend apps/backend/e2e/auth
 
 - 需要的前置构建（例如 `shared`、`api-contracts`、OpenAPI 导出、后端构建等）应由项目自己的 Nx 依赖图（`dependsOn`/项目依赖）或 Vercel 的 `buildCommand` 负责。
 - 这样 dx deploy 不会强依赖 `apps/sdk` 等目录结构，更容易适配不同 monorepo。
+
+### backend 制品发布
+
+当 `dx/config/commands.json` 的 `deploy.backend.internal` 配置为 `backend-artifact-deploy` 时，`dx deploy backend` 走内置的后端制品发布流程，而不是 Vercel 部署。
+
+常用命令：
+
+```bash
+dx deploy backend --prod
+dx deploy backend --build-only
+dx deploy backend --prod --skip-migration
+```
+
+最小示例配置：
+
+```json
+{
+  "deploy": {
+    "backend": {
+      "internal": "backend-artifact-deploy",
+      "backendDeploy": {
+        "build": {
+          "app": "backend",
+          "distDir": "dist/backend",
+          "versionFile": "apps/backend/package.json",
+          "commands": {
+            "development": "npx nx build backend --configuration=development",
+            "staging": "npx nx build backend --configuration=production",
+            "production": "npx nx build backend --configuration=production"
+          }
+        },
+        "runtime": {
+          "appPackage": "apps/backend/package.json",
+          "rootPackage": "package.json",
+          "lockfile": "pnpm-lock.yaml",
+          "prismaSchemaDir": "apps/backend/prisma/schema",
+          "prismaConfig": "apps/backend/prisma.config.ts",
+          "ecosystemConfig": "ecosystem.config.cjs"
+        },
+        "artifact": {
+          "outputDir": "release/backend",
+          "bundleName": "backend-bundle"
+        },
+        "remote": {
+          "host": "deploy.example.com",
+          "port": 22,
+          "user": "deploy",
+          "baseDir": "/srv/example-app"
+        },
+        "startup": {
+          "mode": "pm2",
+          "serviceName": "backend"
+        },
+        "deploy": {
+          "keepReleases": 5,
+          "installCommand": "pnpm install --prod --no-frozen-lockfile --ignore-workspace",
+          "prismaGenerate": true,
+          "prismaMigrateDeploy": true
+        }
+      }
+    }
+  }
+}
+```
+
+固定远端目录协议：
+
+- `<baseDir>/releases/<version-name>`
+- `<baseDir>/current`
+- `<baseDir>/shared/.env.<environment>`
+- `<baseDir>/shared/.env.<environment>.local`
+- `<baseDir>/uploads/<bundle-file>`
+
+运行时制品约束：
+
+- 生成的 release `package.json` 默认只保留运行时依赖；如果应用把 `prisma` 放在 `devDependencies`，dx 会自动把它提升进 release 依赖，保证远端 `prisma generate` / `prisma migrate deploy` 可执行。
+- 打包前会递归扫描整个 staged payload；任意层级出现 `.env*` 文件都会直接失败，避免把环境文件误打进制品。
 
 ## 依赖关系约定
 
