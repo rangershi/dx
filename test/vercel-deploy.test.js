@@ -32,6 +32,7 @@ describe('deployToVercel()', () => {
     process.env.VERCEL_ORG_ID = 'team_xxx'
     process.env.VERCEL_PROJECT_ID_FRONT = 'prj_front'
     process.env.VERCEL_PROJECT_ID_ADMIN = 'prj_admin'
+    process.env.VERCEL_PROJECT_ID_MERCHANT = 'prj_merchant'
     process.env.VERCEL_PROJECT_ID_TELEGRAM_BOT = 'prj_bot'
     process.env.VERCEL_GIT_COMMIT_AUTHOR_EMAIL = ''
     process.env.APP_ENV = 'staging'
@@ -49,6 +50,7 @@ describe('deployToVercel()', () => {
     delete process.env.VERCEL_ORG_ID
     delete process.env.VERCEL_PROJECT_ID_FRONT
     delete process.env.VERCEL_PROJECT_ID_ADMIN
+    delete process.env.VERCEL_PROJECT_ID_MERCHANT
     delete process.env.VERCEL_PROJECT_ID_TELEGRAM_BOT
     delete process.env.APP_ENV
     delete process.env.NODE_ENV
@@ -174,6 +176,8 @@ describe('deployToVercel()', () => {
     const cwd = process.cwd()
     writeFileSync(join(cwd, 'vercel.front.json'), '{}')
     writeFileSync(join(cwd, 'vercel.admin.json'), '{}')
+    writeFileSync(join(cwd, 'vercel.merchant.json'), '{}')
+    process.env.VERCEL_PROJECT_ID_MERCHANT = 'prj_merchant'
 
     const run = jest.fn().mockResolvedValue({ code: 0, stdout: '', stderr: '' })
 
@@ -184,15 +188,18 @@ describe('deployToVercel()', () => {
     })
 
     expect(process.exitCode).toBeUndefined()
-    expect(run).toHaveBeenCalledTimes(4)
+    expect(run).toHaveBeenCalledTimes(6)
 
     expect(run.mock.calls[0][1].cwd).toBe(cwd)
     expect(run.mock.calls[1][1].cwd).toBe(cwd)
     expect(run.mock.calls[2][1].cwd).toBe(cwd)
     expect(run.mock.calls[3][1].cwd).toBe(cwd)
+    expect(run.mock.calls[4][1].cwd).toBe(cwd)
+    expect(run.mock.calls[5][1].cwd).toBe(cwd)
 
     const frontDeployArgs = run.mock.calls[1][0]
     const adminDeployArgs = run.mock.calls[3][0]
+    const merchantDeployArgs = run.mock.calls[5][0]
     expect(frontDeployArgs).toEqual([
       'deploy',
       '--prebuilt',
@@ -210,6 +217,18 @@ describe('deployToVercel()', () => {
       '--prebuilt',
       '--local-config',
       join(cwd, 'vercel.admin.json'),
+      '--yes',
+      '--scope',
+      'team_xxx',
+      '--token',
+      'test-token',
+      '--prod',
+    ])
+    expect(merchantDeployArgs).toEqual([
+      'deploy',
+      '--prebuilt',
+      '--local-config',
+      join(cwd, 'vercel.merchant.json'),
       '--yes',
       '--scope',
       'team_xxx',
@@ -331,6 +350,7 @@ describe('deployToVercel()', () => {
     const adminCwd = cwd
     writeFileSync(join(cwd, 'vercel.front.json'), '{}')
     writeFileSync(join(cwd, 'vercel.admin.json'), '{}')
+    writeFileSync(join(cwd, 'vercel.merchant.json'), '{}')
     mkdirSync(join(cwd, '.vercel'), { recursive: true })
     writeFileSync(
       join(cwd, '.vercel/project.json'),
@@ -346,7 +366,7 @@ describe('deployToVercel()', () => {
     })
 
     expect(process.exitCode).toBeUndefined()
-    expect(run).toHaveBeenCalledTimes(4)
+    expect(run).toHaveBeenCalledTimes(6)
     expect(existsSync(join(cwd, '.vercel/project.json'))).toBe(false)
     expect(existsSync(join(adminCwd, '.vercel/project.json'))).toBe(false)
 

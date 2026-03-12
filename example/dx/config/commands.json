@@ -103,6 +103,50 @@
     }
   },
   "deploy": {
+    "backend": {
+      "internal": "backend-artifact-deploy",
+      "description": "构建、上传并部署 backend 制品到远端主机",
+      "backendDeploy": {
+        "build": {
+          "app": "backend",
+          "distDir": "dist/backend",
+          "versionFile": "apps/backend/package.json",
+          "commands": {
+            "development": "npx nx build backend --configuration=development",
+            "staging": "npx nx build backend --configuration=production",
+            "production": "npx nx build backend --configuration=production"
+          }
+        },
+        "runtime": {
+          "appPackage": "apps/backend/package.json",
+          "rootPackage": "package.json",
+          "lockfile": "pnpm-lock.yaml",
+          "prismaSchemaDir": "apps/backend/prisma/schema",
+          "prismaConfig": "apps/backend/prisma.config.ts",
+          "ecosystemConfig": "ecosystem.config.cjs"
+        },
+        "artifact": {
+          "outputDir": "release/backend",
+          "bundleName": "backend-bundle"
+        },
+        "remote": {
+          "host": "deploy.example.com",
+          "port": 22,
+          "user": "deploy",
+          "baseDir": "/srv/example-app"
+        },
+        "startup": {
+          "mode": "pm2",
+          "serviceName": "backend"
+        },
+        "deploy": {
+          "keepReleases": 5,
+          "installCommand": "pnpm install --prod --no-frozen-lockfile --ignore-workspace",
+          "prismaGenerate": true,
+          "prismaMigrateDeploy": true
+        }
+      }
+    },
     "front": {
       "description": "部署前端（示例占位，具体实现可在项目侧扩展）"
     }
