@@ -365,6 +365,47 @@ dx deploy backend --prod --skip-migration
 - 所有本地路径字段都会被解析为相对项目根目录，并且必须留在项目根目录内；例如 `build.distDir`、`runtime.prismaSchemaDir`、`artifact.outputDir` 不能通过 `../` 逃逸到仓库外。
 - `remote.baseDir` 必须是绝对路径，并且只能包含 `/`、字母、数字、`.`、`_`、`-`；不要使用空格或 shell 特殊字符。
 
+SSH 认证说明：
+
+- `dx deploy backend` 当前直接调用系统 `ssh` / `scp`，不会单独解析 `sshKey`、`identityFile` 之类的 dx 配置项。
+- 因此，发布使用哪把私钥，取决于本机 OpenSSH 的默认认证行为，例如 `ssh-agent`、`~/.ssh/config`、默认私钥文件等。
+- 如果你已经在 `~/.ssh/config` 中配置了主机别名（例如 `Host ai-staging`），推荐直接把 `backendDeploy.remote.host` 写成这个别名，让 OpenSSH 自动匹配对应的 `HostName`、`User`、`Port`、`IdentityFile`。
+
+例如本机 `~/.ssh/config`：
+
+```sshconfig
+Host ai-staging
+  HostName 1.2.3.4
+  User deploy
+  Port 22
+  IdentityFile ~/.ssh/your_staging_key
+```
+
+对应的 `dx/config/commands.json`：
+
+```json
+{
+  "deploy": {
+    "backend": {
+      "internal": "backend-artifact-deploy",
+      "backendDeploy": {
+        "remote": {
+          "host": "ai-staging",
+          "port": 22,
+          "user": "deploy",
+          "baseDir": "/srv/example-app"
+        }
+      }
+    }
+  }
+}
+```
+
+注意：
+
+- `remote.host` 写成别名后，dx 仍会显式传入 `remote.user` 和 `remote.port`；如果这两个值与 `~/.ssh/config` 中的 `User` / `Port` 不一致，命令行参数会覆盖 SSH config。
+- 最稳妥的做法是让 `remote.user`、`remote.port` 与 `~/.ssh/config` 保持一致，或者都统一以 SSH config 中的值为准后再同步到 dx 配置。
+
 ## 依赖关系约定
 
 dx 不负责管理「工程之间的构建依赖关系」。如果多个工程之间存在依赖（例如 `front/admin` 依赖 `shared` 或 `api-contracts`），必须由 Nx 的依赖图来表达并自动拉起：

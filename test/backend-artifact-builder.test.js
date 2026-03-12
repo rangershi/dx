@@ -4,6 +4,7 @@ import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import {
   buildBackendArtifact,
+  buildFlagsForEnvironment,
   createArtifactNames,
   createStagePlan,
 } from '../lib/backend-artifact-deploy/artifact-builder.js'
@@ -24,6 +25,7 @@ describe('backend artifact builder', () => {
 
     const result = await buildBackendArtifact(
       {
+        environment: 'production',
         build: {
           command: 'npx nx build backend --configuration=production',
           distDir: '/repo/dist/backend',
@@ -53,7 +55,12 @@ describe('backend artifact builder', () => {
       innerArchivePath: '/repo/release/backend/backend-v1.2.3-20260312-010203.tgz',
       checksumPath: '/repo/release/backend/backend-v1.2.3-20260312-010203.tgz.sha256',
     })
-    expect(deps.runBuild).toHaveBeenCalled()
+    expect(deps.runBuild).toHaveBeenCalledWith(
+      expect.objectContaining({
+        command: 'npx nx build backend --configuration=production',
+      }),
+      'production',
+    )
     expect(deps.createBundle).toHaveBeenCalled()
   })
 
@@ -129,6 +136,14 @@ describe('backend artifact builder', () => {
       checksumName: 'backend-v1.2.3-20260312-010203.tgz.sha256',
       bundleName: 'backend-bundle-v1.2.3-20260312-010203.tgz',
     })
+  })
+
+  test('maps deploy environment to exec flags used by env layer detection', () => {
+    expect(buildFlagsForEnvironment('production')).toEqual({ prod: true })
+    expect(buildFlagsForEnvironment('staging')).toEqual({ staging: true })
+    expect(buildFlagsForEnvironment('development')).toEqual({ dev: true })
+    expect(buildFlagsForEnvironment(undefined)).toEqual({ dev: true })
+    expect(buildFlagsForEnvironment('unknown')).toEqual({ dev: true })
   })
 
   test('rejects local output paths that escape the configured artifact directory', async () => {
