@@ -191,4 +191,18 @@ describe('resolveBackendDeployConfig', () => {
     ).toThrow('runtime.prismaSchemaDir')
   })
 
+  test('rejects remote.baseDir containing unsafe shell characters', () => {
+    const targetConfig = createTargetConfig()
+    targetConfig.backendDeploy.remote.baseDir = '/srv/example;rm -rf /'
+
+    expect(() =>
+      resolveBackendDeployConfig({
+        cli: createCli(),
+        targetConfig,
+        environment: 'production',
+        flags: {},
+      }),
+    ).toThrow('remote.baseDir')
+  })
+
 })

@@ -1,5 +1,8 @@
 import { describe, expect, jest, test } from '@jest/globals'
-import { deployBackendArtifactRemotely } from '../lib/backend-artifact-deploy/remote-transport.js'
+import {
+  buildEnsureRemoteBaseDirsCommand,
+  deployBackendArtifactRemotely,
+} from '../lib/backend-artifact-deploy/remote-transport.js'
 
 function createConfig(overrides = {}) {
   return {
@@ -32,6 +35,11 @@ function createConfig(overrides = {}) {
 }
 
 describe('deployBackendArtifactRemotely', () => {
+  test('quotes remote mkdir directories to avoid shell metacharacter execution', () => {
+    const command = buildEnsureRemoteBaseDirsCommand("/srv/app'; touch /tmp/pwn #")
+    expect(command).toBe("mkdir -p '/srv/app'\\''; touch /tmp/pwn #/releases' '/srv/app'\\''; touch /tmp/pwn #/shared' '/srv/app'\\''; touch /tmp/pwn #/uploads'")
+  })
+
   test('creates remote directories, uploads bundle, and runs ssh script', async () => {
     const deps = {
       ensureRemoteBaseDirs: jest.fn(async () => {}),
