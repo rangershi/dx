@@ -176,4 +176,19 @@ describe('resolveBackendDeployConfig', () => {
       }),
     ).toThrow('build.commands.production')
   })
+
+  test('rejects local paths that escape projectRoot', () => {
+    const targetConfig = createTargetConfig()
+    targetConfig.backendDeploy.runtime.prismaSchemaDir = '../outside/schema'
+
+    expect(() =>
+      resolveBackendDeployConfig({
+        cli: createCli(),
+        targetConfig,
+        environment: 'production',
+        flags: {},
+      }),
+    ).toThrow('runtime.prismaSchemaDir')
+  })
+
 })
