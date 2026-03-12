@@ -317,10 +317,18 @@ Authoritative inputs:
 
 Required output behavior for V1:
 
+- output `package.json` must include:
+  - `name`
+  - `version`
+  - `private` when present in the app package
+  - `type` when present in the app package
+  - `dependencies`
+  - `packageManager` copied from the workspace root package when present
+  - `engines.node` copied from the workspace root or app package when present
 - include backend runtime `dependencies`
 - exclude `devDependencies`
 - include only the minimal scripts required for remote install and startup, if any are needed by the generated package contract
-- preserve package manager metadata needed for `pnpm` install on the remote host
+- do not include workspace-only fields that imply a full monorepo install on the remote host
 - if backend package dependencies contain `workspace:` or other monorepo-local package references that cannot be installed on the remote host from the generated release package alone, packaging fails explicitly
 - V1 does not rewrite or publish workspace-local dependencies automatically
 - V1 assumes deployable backend runtime dependencies are either normal registry-resolvable packages or already compiled into the built output copied from `distDir`
@@ -342,6 +350,13 @@ Implication:
 
 - if `distDir` contains `apps/backend/src/main.js`, then `startup.entry` should be `apps/backend/src/main.js`
 - both `startup.entry` and Prisma paths are always resolved relative to the extracted release root
+
+Runtime command rule:
+
+- install and Prisma commands run from `<baseDir>/releases/<version-name>`
+- startup commands run from `<baseDir>/current` after the symlink switch
+
+This keeps install and migration pinned to the new release while making runtime process control align with the `current` symlink used for rollback and operator inspection.
 
 ## Prisma Execution Contract
 
@@ -583,6 +598,33 @@ Interface:
 - output: shell command string passed to `ssh`
 
 These units are intentionally narrower than "one big deploy runner" so they can be tested independently.
+
+### Remote result protocol
+
+The remote command builder must emit a shell program that prints exactly one final machine-readable result line on completion or handled failure:
+
+```text
+DX_REMOTE_RESULT=<json>
+```
+
+Minimum JSON shape:
+
+```js
+{
+  ok: boolean,
+  phase: string,
+  message: string,
+  rollbackAttempted: boolean,
+  rollbackSucceeded: boolean | null
+}
+```
+
+Protocol rules:
+
+- the local remote executor captures stdout and stderr from `ssh`
+- it parses the final `DX_REMOTE_RESULT=` line when present
+- parsed JSON becomes the structured success or failure result returned to the CLI layer
+- if `ssh` exits non-zero without a parseable result line, the executor returns an unstructured remote failure using the failure model with the best-known phase
 
 ## Interface Contracts
 
