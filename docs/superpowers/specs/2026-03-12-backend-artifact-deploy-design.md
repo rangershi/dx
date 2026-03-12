@@ -89,7 +89,6 @@ dx deploy backend --dev|--staging|--prod
 Initial optional flags:
 
 - `--build-only`: build and package locally, do not upload or deploy remotely
-- `--upload-only`: upload an already prepared bundle, do not run local build
 - `--skip-install`: remote deploy skips `pnpm install` and Prisma generate
 - `--skip-migration`: remote deploy skips `prisma migrate deploy`
 
@@ -98,6 +97,14 @@ The default path is full end-to-end execution:
 - build locally
 - upload bundle
 - deploy remotely
+
+Environment flag mapping is explicit:
+
+- `--dev` -> `development`
+- `--staging` -> `staging`
+- `--prod` -> `production`
+
+`--build-only` is mutually exclusive with remote deploy behavior. The first version does not include `--upload-only`; upload-without-build can be added later only after a clear bundle input contract is designed.
 
 ## Configuration Model
 
@@ -229,6 +236,8 @@ The bundle exists to keep transport simple while still validating the actual rel
 
 ### Upload phase
 
+`--build-only` stops before this phase.
+
 1. Ensure the local bundle file exists.
 2. Ensure the remote base directories exist using `ssh`.
 3. Upload the bundle into `<baseDir>/uploads/` using `scp`.
@@ -262,7 +271,19 @@ The current `ai-monorepo` scripts generate a runtime-oriented `package.json` rat
 
 The local packaging phase should reuse a built-in runtime package generator, not rely on project-local scripts. It should produce a release `package.json` containing only the runtime dependencies and scripts needed on the server.
 
-For the first version, this behavior is backend-focused and opinionated rather than fully generic.
+Authoritative inputs:
+
+- the configured backend app package file
+- the configured workspace root package file
+
+Required output behavior for V1:
+
+- include backend runtime `dependencies`
+- exclude `devDependencies`
+- include only the minimal scripts required for remote install and startup, if any are needed by the generated package contract
+- preserve package manager metadata needed for `pnpm` install on the remote host
+
+The output contract for V1 is backend-focused and opinionated rather than fully generic. It is acceptable for the generator to support only the dependency and metadata shapes needed by the existing backend deployment model.
 
 ## Startup Modes
 
@@ -289,7 +310,10 @@ Requirements:
 
 Behavior:
 
-- deploy runner starts the service directly with `node <entry>`
+- deploy runner starts the service directly with `node <entry>` as a foreground remote process
+- the `ssh` session remains attached for the lifetime of the process
+- deploy success means the process started successfully and remains alive until the operator ends the session or the process exits
+- this mode is therefore operationally a manual validation or emergency mode, not a normal unattended deploy mode
 
 This mode is useful for one-off validation or environments not managed by `pm2`, but it remains a foreground process model. It is not intended as a production process manager replacement.
 
@@ -307,6 +331,8 @@ The deploy protocol expects remote shared files:
 - `shared/.env.production.local`
 
 During deploy, the runner symlinks the environment pair for the selected environment into the release directory.
+
+If either required environment file is missing, deploy fails before install, migration, `current` switch, or startup.
 
 This keeps secrets outside the artifact and preserves the existing `dx` direction around committed vs local environment responsibility.
 
@@ -327,11 +353,15 @@ This keeps secrets outside the artifact and preserves the existing `dx` directio
 
 - Leave the previous `current` symlink unchanged.
 - Remove incomplete temporary extraction state.
+- Always release the remote deploy lock before exit.
 
 ### Remote failures after `current` switch
 
-- If migration was not executed in this deploy, roll back `current` to the previous target.
+- If migration was not executed in this deploy, roll back `current` to the previous target and attempt to restore service availability:
+  - for `pm2`, restart the previous release using the same startup protocol against the previous target
+  - for `direct`, no automatic restore is attempted because the mode is attached and manual by design
 - If migration was executed, do not automatically roll back `current`.
+- Always release the remote deploy lock before exit.
 
 The no-automatic-rollback-after-migration rule is critical. Old code may no longer be compatible with the migrated schema.
 
