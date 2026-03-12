@@ -60,4 +60,12 @@ describe('remote deploy script', () => {
     expect(script).toContain('包含可疑链接目标')
     expect(script).toContain('目标路径越界')
   })
+
+  test('extracts outer bundle without stripping the top-level files and normalizes checksum lookup', () => {
+    const script = buildRemoteDeployScript(createRemotePhaseModel(createPayload()))
+
+    expect(script).toContain('tar -xzf "$ARCHIVE" -C "$BUNDLE_TEMP_DIR"')
+    expect(script).not.toContain('tar -xzf "$ARCHIVE" -C "$BUNDLE_TEMP_DIR" --strip-components=1')
+    expect(script).toContain('file="$(basename "$file")"')
+  })
 })

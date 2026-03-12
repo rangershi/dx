@@ -63,7 +63,7 @@ describe('deployBackendArtifactRemotely', () => {
     expect(result.ok).toBe(true)
   })
 
-  test('surfaces missing shared env file, lock contention, and checksum mismatch', async () => {
+  test('throws when the remote deploy script reports a failure result', async () => {
     const deps = {
       ensureRemoteBaseDirs: jest.fn(async () => {}),
       uploadBundle: jest.fn(async () => {}),
@@ -74,14 +74,13 @@ describe('deployBackendArtifactRemotely', () => {
       })),
     }
 
-    const result = await deployBackendArtifactRemotely(
-      createConfig(),
-      { versionName: 'backend-v1.2.3-20260312-010203', bundlePath: '/tmp/backend-bundle.tgz' },
-      deps,
-    )
-
-    expect(result.ok).toBe(false)
-    expect(result.phase).toBe('env')
+    await expect(
+      deployBackendArtifactRemotely(
+        createConfig(),
+        { versionName: 'backend-v1.2.3-20260312-010203', bundlePath: '/tmp/backend-bundle.tgz' },
+        deps,
+      ),
+    ).rejects.toThrow('远端部署失败(env): missing shared env')
   })
 
   test('surfaces upload failure and missing remote tool failure', async () => {
@@ -111,12 +110,12 @@ describe('deployBackendArtifactRemotely', () => {
       })),
     }
 
-    const result = await deployBackendArtifactRemotely(
-      createConfig(),
-      { versionName: 'backend-v1.2.3-20260312-010203', bundlePath: '/tmp/backend-bundle.tgz' },
-      toolDeps,
-    )
-
-    expect(result.message).toContain('missing pnpm')
+    await expect(
+      deployBackendArtifactRemotely(
+        createConfig(),
+        { versionName: 'backend-v1.2.3-20260312-010203', bundlePath: '/tmp/backend-bundle.tgz' },
+        toolDeps,
+      ),
+    ).rejects.toThrow('远端部署失败(install): missing pnpm')
   })
 })
