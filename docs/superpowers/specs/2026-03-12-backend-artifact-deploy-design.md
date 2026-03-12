@@ -295,14 +295,14 @@ The bundle exists to keep transport simple while still validating the actual rel
    - `node`
    - `pnpm`
    - `pm2` only when `startup.mode=pm2`
-8. If install is enabled:
-   - run the configured install command inside the release directory
-   - run Prisma generate when enabled
-9. If migration is enabled:
+8. Always run the configured install command inside the release directory.
+9. Run Prisma generate when enabled.
+10. If migration is enabled:
    - run `prisma migrate deploy`
-10. Switch `current` to the new release.
-11. Start the service using the configured startup mode.
-12. On success, prune old releases beyond `keepReleases`.
+11. Switch `current` to the new release.
+12. Start the service using the configured startup mode.
+13. For `pm2` mode, on success, prune old releases beyond `keepReleases`.
+14. For `direct` mode, remain attached to the remote process; automatic release pruning does not run in that attached session.
 
 ## Runtime Package Behavior
 
@@ -389,7 +389,8 @@ Behavior:
 - `startup.entry` is resolved relative to the extracted release root
 - deploy runner starts the service directly with `node <entry>` as a foreground remote process
 - the `ssh` session remains attached for the lifetime of the process
-- deploy success means the process started successfully and remains alive until the operator ends the session or the process exits
+- the command is considered successful only after the remote process exits cleanly
+- while the process is attached, the CLI does not return and post-start cleanup such as release pruning does not run
 - this mode is therefore operationally a manual validation or emergency mode, not a normal unattended deploy mode
 
 This mode is useful for one-off validation or environments not managed by `pm2`, but it remains a foreground process model. It is not intended as a production process manager replacement.
@@ -449,6 +450,29 @@ The no-automatic-rollback-after-migration rule is critical. Old code may no long
 
 - Missing `node`, `pnpm`, or required `pm2` fail the deploy with an explicit message.
 - The first version does not attempt installation or repair.
+
+## Remote Lock Contract
+
+V1 remote deploy must use an atomic lock under `<baseDir>/.deploy.lock`.
+
+Behavior:
+
+- prefer `flock` when available on the remote host
+- fall back to an atomic lock directory such as `<baseDir>/.deploy.lock.d` when `flock` is unavailable
+- if lock acquisition fails, exit without modifying release state
+- lock cleanup is best-effort on normal exit and failure paths
+- stale lock recovery is out of scope for V1; operators must resolve it manually
+
+## Remote Command Execution Contract
+
+Remote deploy commands run through `ssh` using a POSIX shell in strict mode equivalent to `set -euo pipefail`.
+
+Execution expectations:
+
+- stdout and stderr are streamed back to the local CLI
+- non-zero remote exit status is treated as deploy failure
+- the remote executor maps the failing phase into the structured failure model returned to the CLI layer
+- release extraction, install, migration, and startup all run from the extracted release root unless a step explicitly targets another fixed path
 
 ## Validation Matrix
 
