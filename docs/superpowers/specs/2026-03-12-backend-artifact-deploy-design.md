@@ -200,7 +200,9 @@ Resolution rules:
 
 - if `commands` is present, the selected environment key must exist and is used
 - if `commands` is absent, `command` is required and is used for all environments
-- the build command is executed through the normal `dx` command execution path so environment loading for the configured `build.app` can still apply
+- `build.app` is optional
+- when `build.app` is set, the build command is executed through the normal `dx` command execution path so environment loading and required-var validation for that app can apply
+- when `build.app` is `null` or omitted, the build command runs without app-scoped env loading from this runner
 
 This keeps the runner environment-aware without forcing every project to duplicate commands when `staging` and `production` share the same build.
 
@@ -480,7 +482,7 @@ Behavior:
 
 ## Remote Command Execution Contract
 
-Remote deploy commands run through `ssh` using a POSIX shell in strict mode equivalent to `set -euo pipefail`.
+Remote deploy commands run through `ssh` using `bash` in strict mode with `set -euo pipefail`.
 
 Execution expectations:
 
@@ -560,7 +562,7 @@ Responsibilities:
 
 - create remote directories
 - upload bundle using `scp`
-- invoke remote deploy execution over `ssh`
+- invoke the remote shell program over `ssh`
 
 Interface:
 
@@ -571,6 +573,7 @@ Interface:
 
 Responsibilities:
 
+- define the remote deployment phase model that is executed on the server
 - perform locked extraction and validation on the server
 - link environment files
 - check remote tools
@@ -582,14 +585,14 @@ Responsibilities:
 
 Interface:
 
-- input: normalized remote deploy payload
+- input: normalized remote deploy payload interpreted by the generated remote shell program
 - output: success or structured failure
 
 ### 5. Remote command builder
 
 Responsibilities:
 
-- construct the remote shell payload deterministically
+- construct the remote `bash` program deterministically from the remote deploy executor phase model
 - ensure dynamic values are shell-escaped safely
 
 Interface:
@@ -673,6 +676,11 @@ The deploy config resolver returns a shape equivalent to:
   }
 }
 ```
+
+Validation rule:
+
+- for full deploy, `remote.host`, `remote.user`, and `remote.baseDir` are required
+- for `--build-only`, remote config may be omitted because no upload or remote execution occurs
 
 ### Bundle metadata
 
