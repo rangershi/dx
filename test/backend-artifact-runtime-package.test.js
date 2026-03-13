@@ -61,6 +61,38 @@ describe('createRuntimePackage', () => {
     })
   })
 
+  test('promotes required runtime helpers from devDependencies or root package', () => {
+    const runtimePackage = createRuntimePackage({
+      appPackage: {
+        name: '@repo/backend',
+        version: '1.2.3',
+        dependencies: {
+          express: '^4.0.0',
+        },
+        devDependencies: {
+          prisma: '^6.0.0',
+          '@prisma/adapter-pg': '^6.0.0',
+        },
+      },
+      rootPackage: {
+        dependencies: {
+          tslib: '^2.8.1',
+        },
+        devDependencies: {
+          'dotenv-cli': '^8.0.0',
+        },
+      },
+    })
+
+    expect(runtimePackage.dependencies).toEqual({
+      express: '^4.0.0',
+      prisma: '^6.0.0',
+      tslib: '^2.8.1',
+      'dotenv-cli': '^8.0.0',
+      '@prisma/adapter-pg': '^6.0.0',
+    })
+  })
+
   test('fails on workspace dependencies that cannot be installed remotely', () => {
     expect(() =>
       createRuntimePackage({

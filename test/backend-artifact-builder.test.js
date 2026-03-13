@@ -208,4 +208,32 @@ describe('backend artifact builder', () => {
       rmSync(tempDir, { recursive: true, force: true })
     }
   })
+
+  test('writes checksum using the archive basename instead of an absolute path', async () => {
+    const deps = {
+      nowTag: jest.fn(() => '20260312-010203'),
+      readVersion: jest.fn(async () => '1.2.3'),
+      runBuild: jest.fn(async () => {}),
+      prepareOutputDir: jest.fn(async () => {}),
+      stageFiles: jest.fn(async () => {}),
+      assertNoEnvFiles: jest.fn(async () => {}),
+      createInnerArchive: jest.fn(async () => {}),
+      writeChecksum: jest.fn(async () => {}),
+      createBundle: jest.fn(async () => {}),
+    }
+
+    await buildBackendArtifact(
+      {
+        build: { command: 'build', versionFile: '/repo/apps/backend/package.json' },
+        runtime: { appPackage: '/repo/apps/backend/package.json', rootPackage: '/repo/package.json', lockfile: '/repo/pnpm-lock.yaml' },
+        artifact: { outputDir: '/repo/release/backend', bundleName: 'backend-bundle' },
+      },
+      deps,
+    )
+
+    expect(deps.writeChecksum).toHaveBeenCalledWith({
+      archivePath: '/repo/release/backend/backend-v1.2.3-20260312-010203.tgz',
+      checksumPath: '/repo/release/backend/backend-v1.2.3-20260312-010203.tgz.sha256',
+    })
+  })
 })
