@@ -47,6 +47,8 @@ function createTargetConfig(overrides = {}) {
         healthCheck: {
           url: 'http://127.0.0.1:3005/api/v1/health',
           timeoutSeconds: 10,
+          maxWaitSeconds: 24,
+          retryIntervalSeconds: 2,
         },
       },
     },
@@ -75,6 +77,8 @@ describe('resolveBackendDeployConfig', () => {
       healthCheck: {
         url: 'http://127.0.0.1:3005/api/v1/health',
         timeoutSeconds: 10,
+        maxWaitSeconds: 24,
+        retryIntervalSeconds: 2,
       },
     })
   })
@@ -257,6 +261,30 @@ describe('resolveBackendDeployConfig', () => {
         flags: {},
       }),
     ).toThrow('verify.healthCheck.timeoutSeconds')
+
+    const invalidMaxWait = createTargetConfig()
+    invalidMaxWait.backendDeploy.verify.healthCheck.maxWaitSeconds = 0
+
+    expect(() =>
+      resolveBackendDeployConfig({
+        cli: createCli(),
+        targetConfig: invalidMaxWait,
+        environment: 'production',
+        flags: {},
+      }),
+    ).toThrow('verify.healthCheck.maxWaitSeconds')
+
+    const invalidRetryInterval = createTargetConfig()
+    invalidRetryInterval.backendDeploy.verify.healthCheck.retryIntervalSeconds = 0
+
+    expect(() =>
+      resolveBackendDeployConfig({
+        cli: createCli(),
+        targetConfig: invalidRetryInterval,
+        environment: 'production',
+        flags: {},
+      }),
+    ).toThrow('verify.healthCheck.retryIntervalSeconds')
   })
 
 })
