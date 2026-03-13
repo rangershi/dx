@@ -6,7 +6,7 @@ describe('parseRemoteResult', () => {
     const result = parseRemoteResult({
       stdout: [
         'DX_REMOTE_PHASE=startup',
-        'DX_REMOTE_RESULT={"ok":false,"phase":"startup","message":"boom","rollbackAttempted":true,"rollbackSucceeded":false}',
+        'DX_REMOTE_RESULT={"ok":false,"phase":"startup","message":"boom","rollbackAttempted":true,"rollbackSucceeded":false,"summary":{"releaseName":"backend-v1","currentRelease":"/srv/app/releases/backend-v1","serviceName":"backend","serviceStatus":"errored","appEnv":"staging","nodeEnv":"production","healthUrl":"http://127.0.0.1:3005/api/v1/health"}}',
       ].join('\n'),
       stderr: '',
       exitCode: 1,
@@ -18,6 +18,15 @@ describe('parseRemoteResult', () => {
       message: 'boom',
       rollbackAttempted: true,
       rollbackSucceeded: false,
+      summary: {
+        releaseName: 'backend-v1',
+        currentRelease: '/srv/app/releases/backend-v1',
+        serviceName: 'backend',
+        serviceStatus: 'errored',
+        appEnv: 'staging',
+        nodeEnv: 'production',
+        healthUrl: 'http://127.0.0.1:3005/api/v1/health',
+      },
     })
   })
 
@@ -33,5 +42,6 @@ describe('parseRemoteResult', () => {
     expect(result.message).toContain('tar failed')
     expect(result.rollbackAttempted).toBe(false)
     expect(result.rollbackSucceeded).toBeNull()
+    expect(result.summary).toBeNull()
   })
 })
