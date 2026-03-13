@@ -30,6 +30,12 @@ function createPayload() {
       prismaMigrateDeploy: true,
       skipMigration: false,
     },
+    verify: {
+      healthCheck: {
+        url: 'http://127.0.0.1:3005/api/v1/health',
+        timeoutSeconds: 10,
+      },
+    },
   }
 }
 
@@ -67,5 +73,28 @@ describe('remote deploy script', () => {
     expect(script).toContain('tar -xzf "$ARCHIVE" -C "$BUNDLE_TEMP_DIR"')
     expect(script).not.toContain('tar -xzf "$ARCHIVE" -C "$BUNDLE_TEMP_DIR" --strip-components=1')
     expect(script).toContain('file="$(basename "$file")"')
+  })
+
+  test('validates current symlink, pm2 runtime state, and configured health endpoint after startup', () => {
+    const script = buildRemoteDeployScript(createRemotePhaseModel(createPayload()))
+
+    expect(script).toContain('CURRENT_PHASE="verify"')
+    expect(script).toContain('current 软链接不存在')
+    expect(script).toContain('current 软链接未指向本次 release')
+    expect(script).toContain('pm2 describe "$SERVICE_NAME"')
+    expect(script).toContain('pm2 jlist')
+    expect(script).toContain('APP_ENV 不匹配')
+    expect(script).toContain('NODE_ENV 不匹配')
+    expect(script).toContain('curl -fsS --max-time "$HEALTHCHECK_TIMEOUT_SECONDS" "$HEALTHCHECK_URL"')
+  })
+
+  test('skips health check when no verify.healthCheck is configured', () => {
+    const payload = createPayload()
+    payload.verify = { healthCheck: null }
+
+    const script = buildRemoteDeployScript(createRemotePhaseModel(payload))
+
+    expect(script).toContain('HEALTHCHECK_URL=')
+    expect(script).toContain('if [[ -n "$HEALTHCHECK_URL" ]]; then')
   })
 })

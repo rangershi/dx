@@ -30,6 +30,12 @@ function createConfig(overrides = {}) {
       prismaMigrateDeploy: true,
       skipMigration: false,
     },
+    verify: {
+      healthCheck: {
+        url: 'http://127.0.0.1:3005/api/v1/health',
+        timeoutSeconds: 10,
+      },
+    },
     ...overrides,
   }
 }
@@ -60,6 +66,7 @@ describe('deployBackendArtifactRemotely', () => {
     expect(deps.ensureRemoteBaseDirs).toHaveBeenCalled()
     expect(deps.uploadBundle).toHaveBeenCalled()
     expect(deps.runRemoteScript).toHaveBeenCalled()
+    expect(deps.runRemoteScript.mock.calls[0][1]).toContain('http://127.0.0.1:3005/api/v1/health')
     expect(result.ok).toBe(true)
   })
 

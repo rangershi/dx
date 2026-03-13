@@ -43,6 +43,12 @@ function createTargetConfig(overrides = {}) {
         prismaGenerate: true,
         prismaMigrateDeploy: true,
       },
+      verify: {
+        healthCheck: {
+          url: 'http://127.0.0.1:3005/api/v1/health',
+          timeoutSeconds: 10,
+        },
+      },
     },
     ...overrides,
   }
@@ -65,6 +71,12 @@ describe('resolveBackendDeployConfig', () => {
     })
 
     expect(config.build.command).toBe('npx nx build backend --configuration=production')
+    expect(config.verify).toEqual({
+      healthCheck: {
+        url: 'http://127.0.0.1:3005/api/v1/health',
+        timeoutSeconds: 10,
+      },
+    })
   })
 
   test('allows remote config to be omitted for build-only', () => {
@@ -203,6 +215,48 @@ describe('resolveBackendDeployConfig', () => {
         flags: {},
       }),
     ).toThrow('remote.baseDir')
+  })
+
+  test('allows verify.healthCheck to be omitted entirely', () => {
+    const targetConfig = createTargetConfig()
+    delete targetConfig.backendDeploy.verify
+
+    const config = resolveBackendDeployConfig({
+      cli: createCli(),
+      targetConfig,
+      environment: 'production',
+      flags: {},
+    })
+
+    expect(config.verify).toEqual({
+      healthCheck: null,
+    })
+  })
+
+  test('rejects invalid verify.healthCheck values', () => {
+    const missingUrl = createTargetConfig()
+    delete missingUrl.backendDeploy.verify.healthCheck.url
+
+    expect(() =>
+      resolveBackendDeployConfig({
+        cli: createCli(),
+        targetConfig: missingUrl,
+        environment: 'production',
+        flags: {},
+      }),
+    ).toThrow('verify.healthCheck.url')
+
+    const invalidTimeout = createTargetConfig()
+    invalidTimeout.backendDeploy.verify.healthCheck.timeoutSeconds = 0
+
+    expect(() =>
+      resolveBackendDeployConfig({
+        cli: createCli(),
+        targetConfig: invalidTimeout,
+        environment: 'production',
+        flags: {},
+      }),
+    ).toThrow('verify.healthCheck.timeoutSeconds')
   })
 
 })
