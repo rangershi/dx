@@ -343,6 +343,14 @@ dx deploy backend --prod --skip-migration
           "installCommand": "pnpm install --prod --no-frozen-lockfile --ignore-workspace",
           "prismaGenerate": true,
           "prismaMigrateDeploy": true
+        },
+        "verify": {
+          "healthCheck": {
+            "url": "http://127.0.0.1:3005/api/v1/health",
+            "timeoutSeconds": 10,
+            "maxWaitSeconds": 24,
+            "retryIntervalSeconds": 2
+          }
         }
       }
     }
@@ -364,6 +372,56 @@ dx deploy backend --prod --skip-migration
 - 打包前会递归扫描整个 staged payload；任意层级出现 `.env*` 文件都会直接失败，避免把环境文件误打进制品。
 - 所有本地路径字段都会被解析为相对项目根目录，并且必须留在项目根目录内；例如 `build.distDir`、`runtime.prismaSchemaDir`、`artifact.outputDir` 不能通过 `../` 逃逸到仓库外。
 - `remote.baseDir` 必须是绝对路径，并且只能包含 `/`、字母、数字、`.`、`_`、`-`；不要使用空格或 shell 特殊字符。
+
+部署后验活与成功摘要：
+
+- `dx deploy backend` 在远端启动完成后，会继续校验 `current` 软链接是否切到本次 release。
+- 如果 `startup.mode` 是 `pm2`，还会校验 PM2 进程是否存在，以及 PM2 中的 `APP_ENV` / `NODE_ENV` 是否与部署环境一致。
+- 如果配置了 `verify.healthCheck`，dx 会在远端对健康检查地址做重试探测；适合处理不同项目启动时间不一致的问题。
+- 成功后，dx 会在本地 CLI 回显一段摘要，默认包含：
+  - release 版本名
+  - current 当前指向的 release 目录
+  - service/status
+  - APP_ENV / NODE_ENV
+  - health 地址
+
+示例成功输出：
+
+```text
+✅ 后端部署成功: backend-v0.0.24-20260313-174425
+🚀 [deploy-summary] current=/opt/work/noveai/releases/backend-v0.0.24-20260313-174425
+🚀 [deploy-summary] service=noveai-backend status=online
+🚀 [deploy-summary] APP_ENV=staging NODE_ENV=production
+🚀 [deploy-summary] health=http://127.0.0.1:3005/api/v1/health
+```
+
+`verify.healthCheck` 配置说明：
+
+- `url`：健康检查地址。未配置时，dx 会跳过 health check，但仍会执行 `current` / PM2 验活。
+- `timeoutSeconds`：单次 `curl` 请求超时。
+- `maxWaitSeconds`：从启动后开始，health check 最长等待多久；超过这个时间仍未成功则失败。
+- `retryIntervalSeconds`：两次 health check 之间的等待间隔。
+
+推荐配置：
+
+```json
+{
+  "verify": {
+    "healthCheck": {
+      "url": "http://127.0.0.1:3005/api/v1/health",
+      "timeoutSeconds": 10,
+      "maxWaitSeconds": 24,
+      "retryIntervalSeconds": 2
+    }
+  }
+}
+```
+
+说明：
+
+- `timeoutSeconds` 控制“单次请求能等多久”。
+- `maxWaitSeconds` 控制“服务从启动到 ready 最多允许多久”。
+- `retryIntervalSeconds` 越小，ready 后越快通过；越大，请求频率越低。
 
 SSH 认证说明：
 
