@@ -75,4 +75,69 @@ test('copies codex skills and agents into ~/.codex with merge-overwrite semantic
 
     expect(existsSync(join(homeDir, '.codex/skills'))).toBe(false)
   })
+
+  test('creates ~/.codex/config.toml with required codex settings when missing', async () => {
+    mkdirSync(join(packageRoot, 'codex/skills/skill-a'), { recursive: true })
+    mkdirSync(join(packageRoot, 'codex/agents'), { recursive: true })
+    writeFileSync(join(packageRoot, 'codex/skills/skill-a/SKILL.md'), '# skill a')
+    writeFileSync(join(packageRoot, 'codex/agents/fixer.toml'), 'model = "gpt"')
+
+    await runCodexInitial({ packageRoot, homeDir })
+
+    const configToml = readFileSync(join(homeDir, '.codex/config.toml'), 'utf8')
+
+    expect(configToml).toContain('[features]')
+    expect(configToml).toContain('multi_agent = true')
+    expect(configToml).toContain('[agents]')
+    expect(configToml).toContain('max_threads = 15')
+    expect(configToml).toContain('[agents.fixer]')
+    expect(configToml).toContain('description = "bugfix 代理"')
+    expect(configToml).toContain('config_file = "agents/fixer.toml"')
+    expect(configToml).toContain('[agents.orchestrator]')
+    expect(configToml).toContain('config_file = "agents/orchestrator.toml"')
+    expect(configToml).toContain('[agents.reviewer]')
+    expect(configToml).toContain('config_file = "agents/reviewer.toml"')
+    expect(configToml).toContain('[agents.spark]')
+    expect(configToml).toContain('config_file = "agents/spark.toml"')
+  })
+
+  test('repairs required codex settings while preserving unrelated config', async () => {
+    mkdirSync(join(packageRoot, 'codex/skills/skill-a'), { recursive: true })
+    mkdirSync(join(packageRoot, 'codex/agents'), { recursive: true })
+    mkdirSync(join(homeDir, '.codex'), { recursive: true })
+    writeFileSync(join(packageRoot, 'codex/skills/skill-a/SKILL.md'), '# skill a')
+    writeFileSync(join(packageRoot, 'codex/agents/fixer.toml'), 'model = "gpt"')
+    writeFileSync(
+      join(homeDir, '.codex/config.toml'),
+      [
+        '[features]',
+        'multi_agent = false',
+        '',
+        '[agents]',
+        'max_threads = 3',
+        '',
+        '[agents.fixer]',
+        'description = "old fixer"',
+        'config_file = "agents/old.toml"',
+        '',
+        '[ui]',
+        'theme = "dark"',
+        '',
+      ].join('\n'),
+    )
+
+    await runCodexInitial({ packageRoot, homeDir })
+
+    const configToml = readFileSync(join(homeDir, '.codex/config.toml'), 'utf8')
+
+    expect(configToml).toContain('multi_agent = true')
+    expect(configToml).toContain('max_threads = 15')
+    expect(configToml).toContain('description = "bugfix 代理"')
+    expect(configToml).toContain('config_file = "agents/fixer.toml"')
+    expect(configToml).toContain('[ui]')
+    expect(configToml).toContain('theme = "dark"')
+    expect(configToml).toContain('[agents.orchestrator]')
+    expect(configToml).toContain('[agents.reviewer]')
+    expect(configToml).toContain('[agents.spark]')
+  })
 })
