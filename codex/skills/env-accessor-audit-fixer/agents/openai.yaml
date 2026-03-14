@@ -1,0 +1,7 @@
+interface:
+  display_name: "环境变量审计修复"
+  short_description: "审计并修复 process.env 直读，必要时补齐统一 env 访问基础设施"
+  default_prompt: "使用 $env-accessor-audit-fixer 扫描项目中的 process.env 直读，判断是否已具备统一 env 访问基础设施，并给出或实施修复方案。"
+
+policy:
+  allow_implicit_invocation: true

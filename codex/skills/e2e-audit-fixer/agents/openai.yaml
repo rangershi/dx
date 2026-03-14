@@ -1,0 +1,4 @@
+interface:
+  display_name: "E2E Audit Fixer"
+  short_description: "扫描 E2E 测试中文名称、手工请求与重复实现，并输出可控修复建议"
+  default_prompt: "使用 $e2e-audit-fixer 对 E2E 测试进行 e2e-chinese 与 e2e-fixtures 检查，并按修复建议输出可执行改动。"

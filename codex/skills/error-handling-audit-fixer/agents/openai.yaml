@@ -1,0 +1,7 @@
+interface:
+  display_name: "错误处理规范检查"
+  short_description: "按 src 与 e2e 分开审计后端异常是否绕过 DomainException 与 ErrorCode 体系"
+  default_prompt: "使用 $error-handling-audit-fixer 先审计 backend src，再按需审计 e2e，检查错误处理是否绕过 DomainException / ErrorCode 体系，并在基础设施缺失时给出补齐建议。"
+
+policy:
+  allow_implicit_invocation: true

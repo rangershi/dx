@@ -1,0 +1,7 @@
+interface:
+  display_name: "分页 DTO 检查修复"
+  short_description: "检查并修复后端分页 DTO 是否符合统一分页基类规范"
+  default_prompt: "使用 $pagination-dto-audit-fixer 检查 backend 中分页 DTO 和分页返回结构是否符合统一规范，并给出可执行修复建议。"
+
+policy:
+  allow_implicit_invocation: true
