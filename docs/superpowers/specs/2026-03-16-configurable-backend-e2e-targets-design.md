@@ -95,10 +95,11 @@ This keeps future onboarding simple: adding another backend E2E target becomes a
 Instead it should:
 
 1. resolve `type`, `target`, and optional `testPath` from positionals
-2. look up `commands.test[type][target]`
-3. if `type !== 'e2e'`, preserve existing behavior
-4. if `target === 'all'` and `type === 'e2e'`, reject immediately with a dedicated message
-5. if the resolved target config has `requiresPath: true`:
+2. if `target === 'all'` and `type === 'e2e'`, reject immediately with a dedicated message
+3. look up `commands.test[type][target]`
+4. if the target config does not exist, preserve the existing `未找到测试配置` error path
+5. if `type !== 'e2e'`, preserve existing behavior
+6. if the resolved target config has `requiresPath: true`:
    - reject when `testPath` is missing
    - reject when `testPath === 'all'`
 
@@ -114,6 +115,8 @@ Instead, for `type === 'e2e'`:
 - replace `{TEST_PATH}` with the provided path
 - append `-t "<pattern>"` when the user passed `-t`
 - execute the resulting target-specific command
+
+`TEST_PATH` and any appended `-t` value must use the CLI's existing shell-safe escaping rules before interpolation. The implementation must not directly concatenate raw user input into the command string.
 
 If a target sets `requiresPath: true` but omits `fileCommand`, CLI should fail with a configuration error instead of silently falling back. That keeps project misconfiguration obvious and avoids accidentally running the wrong command shape.
 
@@ -148,6 +151,7 @@ Add or update CLI tests for:
 - `dx test e2e all` is rejected
 - guarded target with a path uses its own `fileCommand`
 - `-t` continues to append to the resolved guarded command correctly
+- unguarded E2E targets that do not set `requiresPath: true` preserve their previous behavior
 - help output includes the new multi-target examples and restrictions
 
 Use fixture config that declares at least two guarded E2E targets so the tests verify configurability rather than a renamed backend-only flow.
