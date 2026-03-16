@@ -280,6 +280,8 @@
       "backend": {
         "command": "npx nx test:e2e backend",
         "app": "backend",
+        "requiresPath": true,
+        "fileCommand": "npx nx test:e2e backend -- {TEST_PATH}",
         "description": "运行后端E2E测试"
       },
       "all": {

@@ -199,11 +199,13 @@ dx deploy front --staging
 dx deploy backend --prod
 dx lint
 dx test e2e backend apps/backend/e2e/auth
+dx test e2e quantify apps/quantify/e2e/health/health.e2e-spec.ts
 ```
 
 命令约束摘要：
 
-- `dx test e2e backend` 必须提供文件或目录路径，禁止无路径全量执行
+- 对声明了 `requiresPath: true` 的 E2E target，`dx test e2e <target>` 必须提供文件或目录路径，禁止无路径或 `all` 全量执行
+- `dx test e2e all` 不受支持，必须显式指定 target 和路径
 - `dx db migrate` 仅允许在 `--dev` 环境创建迁移；非开发环境请使用 `dx db deploy`
 - `dx start` 未指定服务时默认是开发套件，仅允许 `--dev`
 - `dx start` 下的单层目标（如 `stagewise-front`）默认仅支持 `--dev`

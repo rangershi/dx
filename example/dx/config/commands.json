@@ -159,6 +159,24 @@
     "command": "npx nx lint",
     "description": "运行 lint"
   },
+  "test": {
+    "e2e": {
+      "backend": {
+        "command": "npx nx test:e2e backend",
+        "app": "backend",
+        "requiresPath": true,
+        "fileCommand": "npx nx test:e2e backend -- {TEST_PATH}",
+        "description": "按文件或目录运行 backend E2E"
+      }
+    },
+    "unit": {
+      "backend": {
+        "command": "npx nx test backend",
+        "app": "backend",
+        "description": "运行 backend 单元测试"
+      }
+    }
+  },
   "clean": {
     "all": {
       "command": "rm -rf node_modules dist",
