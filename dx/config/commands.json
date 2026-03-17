@@ -356,12 +356,12 @@
       }
     },
     "stagewise-front": {
-      "command": "npx stagewise@latest -b -s -a 3001 -p 3002 -w ./apps/front",
+      "command": "npx stagewise@0.11.1 -b -s -a 3001 -p 3002 -w ./apps/front",
       "description": "Stagewise 桥接 front (3001→3002)",
       "ports": [3002]
     },
     "stagewise-admin": {
-      "command": "npx stagewise@latest -b -s -a 3500 -p 3501 -w ./apps/admin-front",
+      "command": "npx stagewise@0.11.1 -b -s -a 3500 -p 3501 -w ./apps/admin-front",
       "description": "Stagewise 桥接 admin-front (3500→3501)",
       "ports": [3501]
     }

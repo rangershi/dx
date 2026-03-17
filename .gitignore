@@ -33,3 +33,4 @@ __pycache__/
 *.pyd
 /.idea/nx-angular-config.xml
 /.idea/compiler.xml
+/.omc/
