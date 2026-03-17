@@ -102,6 +102,24 @@ describe('remote deploy script', () => {
     expect(script).toContain('curl -fsS --max-time "$HEALTHCHECK_TIMEOUT_SECONDS" "$HEALTHCHECK_URL"')
   })
 
+  test('includes prisma-seed phase when prismaSeed is enabled', () => {
+    const payload = createPayload()
+    payload.deploy.prismaSeed = true
+
+    const script = buildRemoteDeployScript(createRemotePhaseModel(payload))
+
+    expect(script).toContain('SHOULD_SEED=1')
+    expect(script).toContain('CURRENT_PHASE="prisma-seed"')
+    expect(script).toContain('DX_REMOTE_PHASE=prisma-seed')
+    expect(script).toContain('db seed --schema=')
+  })
+
+  test('skips prisma-seed phase when prismaSeed is not enabled', () => {
+    const script = buildRemoteDeployScript(createRemotePhaseModel(createPayload()))
+
+    expect(script).toContain('SHOULD_SEED=0')
+  })
+
   test('skips health check when no verify.healthCheck is configured', () => {
     const payload = createPayload()
     payload.verify = { healthCheck: null }

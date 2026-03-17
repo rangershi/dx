@@ -193,6 +193,48 @@ describe('resolveBackendDeployConfig', () => {
     ).toThrow('build.commands.production')
   })
 
+  test('defaults prismaSeed to false', () => {
+    const config = resolveBackendDeployConfig({
+      cli: createCli(),
+      targetConfig: createTargetConfig(),
+      environment: 'production',
+      flags: {},
+    })
+
+    expect(config.deploy.prismaSeed).toBe(false)
+  })
+
+  test('enables prismaSeed when explicitly set to true', () => {
+    const targetConfig = createTargetConfig()
+    targetConfig.backendDeploy.deploy.prismaSeed = true
+
+    const config = resolveBackendDeployConfig({
+      cli: createCli(),
+      targetConfig,
+      environment: 'production',
+      flags: {},
+    })
+
+    expect(config.deploy.prismaSeed).toBe(true)
+  })
+
+  test('requires prisma paths when only prismaSeed is enabled', () => {
+    const targetConfig = createTargetConfig()
+    targetConfig.backendDeploy.deploy.prismaGenerate = false
+    targetConfig.backendDeploy.deploy.prismaMigrateDeploy = false
+    targetConfig.backendDeploy.deploy.prismaSeed = true
+    delete targetConfig.backendDeploy.runtime.prismaConfig
+
+    expect(() =>
+      resolveBackendDeployConfig({
+        cli: createCli(),
+        targetConfig,
+        environment: 'production',
+        flags: {},
+      }),
+    ).toThrow('runtime.prismaConfig')
+  })
+
   test('rejects local paths that escape projectRoot', () => {
     const targetConfig = createTargetConfig()
     targetConfig.backendDeploy.runtime.prismaSchemaDir = '../outside/schema'
