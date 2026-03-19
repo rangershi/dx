@@ -2,16 +2,18 @@
 # Deterministic PR review aggregation (script owns all rules).
 #
 # Workflow:
-# - Mode A: read contextFile + reviewFile(s) from project cache: ./.cache/, parse findings, merge duplicates,
+# - Mode A: read contextFile + reviewFile(s) from project cache: ./.cache/, consume an LLM-produced aggregate result,
 #   post a single PR comment, and generate a fixFile for fixer.
 # - Mode B: read fixReportFile from cache and post it as a PR comment.
 #
 # Input rules:
 # - Callers should pass repo-relative paths (e.g. ./.cache/foo.md). For backward-compat, basenames are also accepted.
-# - Duplicate groups come from LLM but are passed as an argument (NOT written to disk).
-#   - Prefer: --duplicate-groups-b64 <base64(json)>
-#   - Also supported: --duplicate-groups-json '<json>'
-#   - Invalid/missing duplicate groups => treated as no dedupe (do not fail).
+# - Aggregate result comes from LLM and is passed as an argument (NOT written to disk).
+#   - Prefer: --aggregate-result-b64 <base64(json)>
+#   - Also supported: --aggregate-result-json '<json>'
+#   - Missing/invalid aggregate result => fail closed.
+# - Duplicate groups / escalation groups may still be passed for backward-compatible tooling,
+#   but they are no longer used by this script to decide findings or stop.
 #
 # Output rules:
 # - Stdout must print exactly ONE JSON object and nothing else.
@@ -459,6 +461,101 @@ def _parse_review_findings(md_text):
     return normalized
 
 
+def _normalize_aggregate_finding(it):
+    if not isinstance(it, dict):
+        return None
+
+    required_fields = [
+        "id",
+        "priority",
+        "category",
+        "file",
+        "line",
+        "title",
+        "description",
+        "suggestion",
+    ]
+    for field in required_fields:
+        val = it.get(field)
+        if not isinstance(val, str) or not val.strip():
+            return None
+
+    priority = it.get("priority", "").strip().upper()
+    if priority not in {"P0", "P1", "P2", "P3"}:
+        return None
+
+    return {
+        "id": it["id"].strip(),
+        "priority": priority,
+        "category": it["category"].strip(),
+        "file": it["file"].strip(),
+        "line": it["line"].strip(),
+        "title": it["title"].strip(),
+        "description": it["description"].strip(),
+        "suggestion": it["suggestion"].strip(),
+    }
+
+
+def _normalize_aggregate_findings(items):
+    if not isinstance(items, list):
+        return None
+
+    out = []
+    for it in items:
+        normalized = _normalize_aggregate_finding(it)
+        if not normalized:
+            return None
+        out.append(normalized)
+    return out
+
+
+def _parse_aggregate_result_json(s):
+    if not s:
+        return None
+    try:
+        data = json.loads(s)
+    except Exception:
+        return None
+
+    if not isinstance(data, dict):
+        return None
+
+    stop = data.get("stop")
+    if not isinstance(stop, bool):
+        return None
+
+    must_fix = _normalize_aggregate_findings(data.get("mustFixFindings"))
+    optional = _normalize_aggregate_findings(data.get("optionalFindings"))
+    if must_fix is None or optional is None:
+        return None
+
+    if any(_priority_rank(f.get("priority")) > 1 for f in must_fix):
+        return None
+    if any(_priority_rank(f.get("priority")) < 2 for f in optional):
+        return None
+
+    if stop and must_fix:
+        return None
+    if (not stop) and (not must_fix):
+        return None
+
+    return {
+        "stop": stop,
+        "mustFixFindings": must_fix,
+        "optionalFindings": optional,
+    }
+
+
+def _parse_aggregate_result_b64(s):
+    if not s:
+        return None
+    try:
+        raw = base64.b64decode(s.encode("ascii"), validate=True)
+        return _parse_aggregate_result_json(raw.decode("utf-8", errors="replace"))
+    except Exception:
+        return None
+
+
 def _merge_duplicates(findings, duplicate_groups):
     by_id = {f["id"]: dict(f) for f in findings}
     merged_map = {}
@@ -685,6 +782,8 @@ def main(argv):
     parser.add_argument("--review-file", action="append", default=[])
     parser.add_argument("--fix-report-file")
     parser.add_argument("--final-report")
+    parser.add_argument("--aggregate-result-json")
+    parser.add_argument("--aggregate-result-b64")
     parser.add_argument("--duplicate-groups-json")
     parser.add_argument("--duplicate-groups-b64")
     parser.add_argument("--decision-log-file")
@@ -759,36 +858,22 @@ def main(argv):
         return 1
 
     raw_reviews = []
-    all_findings = []
     for rf in review_files:
         md = _read_cache_text(rf)
         raw_reviews.append((rf, md))
-        all_findings.extend(_parse_review_findings(md))
+    aggregate_result = _parse_aggregate_result_json(args.aggregate_result_json or "")
+    if not aggregate_result:
+        aggregate_result = _parse_aggregate_result_b64(args.aggregate_result_b64 or "")
+    if not aggregate_result:
+        _json_out({"error": "INVALID_AGGREGATE_RESULT"})
+        return 1
 
-    duplicate_groups = _parse_duplicate_groups_json(args.duplicate_groups_json or "")
-    if not duplicate_groups:
-        duplicate_groups = _parse_duplicate_groups_b64(args.duplicate_groups_b64 or "")
-    merged_findings, merged_map = _merge_duplicates(all_findings, duplicate_groups)
-    
-    decision_log_file = (args.decision_log_file or "").strip() or None
-    prior_decisions = []
-    if decision_log_file:
-        try:
-            decision_log_md = _read_cache_text(decision_log_file)
-            prior_decisions = _parse_decision_log(decision_log_md)
-        except Exception:
-            pass
-    
-    escalation_groups = _parse_escalation_groups_b64(args.escalation_groups_b64 or "")
-    
-    if prior_decisions:
-        merged_findings = _filter_by_decision_log(merged_findings, prior_decisions, escalation_groups)
-    
+    must_fix = list(aggregate_result["mustFixFindings"])
+    optional = list(aggregate_result["optionalFindings"])
+    merged_findings = must_fix + optional
+    merged_map = {}
     counts = _counts(merged_findings)
-
-    must_fix = [f for f in merged_findings if _priority_rank(f.get("priority")) <= 1]
-    optional = [f for f in merged_findings if _priority_rank(f.get("priority")) >= 2]
-    stop = len(must_fix) == 0
+    stop = bool(aggregate_result["stop"])
 
     body = _render_mode_a_comment(pr_number, round_num, run_id, counts, must_fix, merged_map, raw_reviews)
     body_basename = f"review-aggregate-comment-pr{pr_number}-r{round_num}-{run_id}.md"

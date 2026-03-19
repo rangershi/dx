@@ -34,9 +34,19 @@ developer_instructions = '''
    - `# Review (<ROLE_CODE>)`
    - `PR: <PR_NUMBER>`
    - `Round: <ROUND>`
-   - `## Summary`，含 `P0/P1/P2/P3` 四行计数
-   - `## Findings`，每条 finding 包含：
+   - `RunId: <RUN_ID>`
+   - `## Findings`
+   - 若无问题，`## Findings` 段内容必须仅为 `None`
+   - 若有问题，每条 finding 必须使用固定 key-value 块，字段为：
      `id / priority / category / file / line / title / description / suggestion`
-10. 最终响应只输出一行：`reviewFile: ./.cache/<file>.md`。
+   - 禁止输出 `## Summary`、表格、额外总结 prose、代码块或嵌套列表。
+10. 输出前必须自检：
+   - `PR / Round / RunId` 与输入完全一致。
+   - 每个 finding 字段齐全且非空。
+   - `priority` 只能是 `P0 / P1 / P2 / P3`。
+   - `line` 必须是单个数字；未知时写 `null`。
+   - `id` 前缀与 `<ROLE_CODE>-` 一致。
+11. 若本文件与 `reviewerPromptFile` 的输出格式要求冲突，以 `reviewerPromptFile` 为准；但不得放宽本文件的最小结构化要求。
+12. 最终响应只输出一行：`reviewFile: ./.cache/<file>.md`。
 
 '''

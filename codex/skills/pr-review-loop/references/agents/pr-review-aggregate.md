@@ -45,26 +45,78 @@ runId: 123-1-a1b2c3d
 
 ## 执行方式（强制）
 
-所有确定性工作（解析/聚合/发评论/生成 fixFile/输出 JSON）都由 `${CODEX_HOME:-$HOME/.codex}/skills/pr-review-loop/scripts/pr_review_aggregate.py` 完成。
+所有确定性工作（发评论/生成 fixFile/输出 JSON）都由 `${CODEX_HOME:-$HOME/.codex}/skills/pr-review-loop/scripts/pr_review_aggregate.py` 完成。
 
-你只做两件事：
+你只做三件事：
 
-1) 在模式 A 里用大模型判断哪些 finding 是重复的，并把重复分组作为参数传给脚本（不落盘）。
-2) 调用脚本后，把脚本 stdout 的 JSON **原样返回**给调用者（不做解释/分析）。
+1) 在模式 A 里读取 `contextFile`、所有 `reviewFile`，由大模型做最终语义裁决。
+2) 产出一份**结构化聚合结果 JSON**，再把它作为参数传给脚本（不落盘）。
+3) 调用脚本后，把脚本 stdout 的 JSON **原样返回**给调用者（不做解释/分析）。
 
-## 重复分组（仅作为脚本入参）
+## 最终裁决边界（强制）
 
-你需要基于所有 `reviewFile` 内容判断重复 finding 分组，生成**一行 JSON**（不要代码块、不要解释文字、不要换行）。
+- “是否存在问题”“哪些问题必须修”“是否可以 stop” 都由你基于 `reviewFile` 语义判断。
+- 脚本**不再**根据 reviewer 文本自行推断 `P0/P1`、`stop` 或“有没有问题”。
+- 如果 reviewer 文本里缺少关键信息，导致你无法可靠裁决，必须返回错误；禁止把不确定性伪装成 `stop=true`。
 
-注意：这行 JSON **不是你的最终输出**，它只用于生成 `--duplicate-groups-b64` 传给脚本。
+## 聚合结果 JSON（模式 A 必须生成）
+
+你需要基于 `contextFile`、所有 `reviewFile`，先完成这些判断：
+
+- 去重：本质相同的问题只保留一条
+- decision-log 过滤：已 fixed 的问题过滤；已 rejected 的问题仅在满足升级质疑条件时保留
+- 分级：把保留的问题分成 `mustFixFindings` 和 `optionalFindings`
+- 终止判断：仅当你确认没有 `mustFixFindings` 时，才可令 `stop=true`
+
+然后输出一行 JSON，结构固定如下：
 
 ```json
-{"duplicateGroups":[["PERF-001","BIZ-003"],["MAINT-002","BIZ-005","SEC-004"]]}
+{
+  "stop": false,
+  "mustFixFindings": [
+    {
+      "id": "SEC-001",
+      "priority": "P1",
+      "category": "bug",
+      "file": "apps/api/src/service.ts",
+      "line": "10",
+      "title": "标题",
+      "description": "描述",
+      "suggestion": "建议"
+    }
+  ],
+  "optionalFindings": [
+    {
+      "id": "STY-002",
+      "priority": "P3",
+      "category": "quality",
+      "file": "apps/web/src/page.tsx",
+      "line": "22",
+      "title": "标题",
+      "description": "描述",
+      "suggestion": "建议"
+    }
+  ]
+}
 ```
+
+强约束：
+
+- 必须是一行 JSON，不要代码块，不要解释。
+- `stop=true` 时，`mustFixFindings` 必须为空数组。
+- `stop=false` 时，`mustFixFindings` 必须至少有一条。
+- 每个 finding 必须包含这些字段且非空：`id`、`priority`、`category`、`file`、`line`、`title`、`description`、`suggestion`
+- `priority` 只能是 `P0` / `P1` / `P2` / `P3`
+- `mustFixFindings` 只允许 `P0` / `P1`
+- `optionalFindings` 只允许 `P2` / `P3`
+
+## 重复分组与 decision-log（仅作为你的思考步骤）
+
+你仍然需要基于所有 `reviewFile` 内容判断重复问题和 decision-log 匹配，但这些中间结果**不再**单独传给脚本；它们只体现在最终的聚合结果 JSON 里。
 
 ## 智能匹配（仅在模式 A + decision-log 存在时）
 
-如果 decision-log（`./.cache/decision-log-pr<PR_NUMBER>.md`）存在，你需要基于 LLM 判断每个新 finding 与已决策问题的本质是否相同，从而生成 **escalation_groups** 参数。
+如果 decision-log（`./.cache/decision-log-pr<PR_NUMBER>.md`）存在，你需要基于 LLM 判断每个新 finding 与已决策问题的本质是否相同，并把判断结果体现在最终聚合结果里。
 
 **匹配原则**：
 - **Essence 匹配**：对比 `essence` 字段与新 finding 的问题本质。
@@ -84,23 +136,11 @@ runId: 123-1-a1b2c3d
    - 例如：已 rejected P3 but finding 为 P1 → 可升级质疑
    - 例如：已 rejected P2 but finding 为 P0 → 可升级质疑
    - 例如：已 rejected P2 but finding 为 P1 → 不升级（仅差 1 级）
-5. 生成**一行 JSON**（不要代码块、不要解释文字、不要换行），结构如下：
-
-```json
-{"escalationGroups":[["SEC-001"],["MAINT-002","BIZ-005"]]}
-```
-
-其中每个组表示「可以作为已 rejected 问题的升级质疑」的 finding ID 集合。若无可升级问题，输出空数组：
-
-```json
-{"escalationGroups":[]}
-```
-
-注意：escalation_groups JSON **不是你的最终输出**，它只用于生成 `--escalation-groups-b64` 传给脚本。
+5. 只把满足条件的升级问题保留到最终 `mustFixFindings` 或 `optionalFindings`；其余继续按 rejected 过滤。
 
 ## 调用脚本（强制）
 
-模式 A（带 reviewFile + 重复分组 + 智能匹配）：
+模式 A（带 reviewFile + 聚合结果）：
 
 ```bash
 python3 "${CODEX_HOME:-$HOME/.codex}/skills/pr-review-loop/scripts/pr_review_aggregate.py" \
@@ -111,16 +151,12 @@ python3 "${CODEX_HOME:-$HOME/.codex}/skills/pr-review-loop/scripts/pr_review_agg
   --review-file <REVIEW_FILE_1> \
   --review-file <REVIEW_FILE_2> \
   --review-file <REVIEW_FILE_3> \
-  --duplicate-groups-b64 <BASE64_JSON> \
-  --decision-log-file ./.cache/decision-log-pr<PR_NUMBER>.md \
-  --escalation-groups-b64 <BASE64_JSON>
+  --aggregate-result-b64 <BASE64_JSON>
 ```
 
 **参数说明**：
 
-- `--duplicate-groups-b64`：base64 编码的 JSON，格式同上，例如 `eyJkdXBsaWNhdGVHcm91cHMiOltbIkNEWC0wMDEiLCJDTEQtMDAzIl1dfQ==`
-- `--decision-log-file`：decision-log 文件路径（可选；若不存在则跳过智能匹配逻辑）
-- `--escalation-groups-b64`：base64 编码的 escalation groups JSON，格式如上，例如 `eyJlc2NhbGF0aW9uR3JvdXBzIjpbWyJDRFgtMDAxIl1dfQ==`
+- `--aggregate-result-b64`：base64 编码的聚合结果 JSON
 
 模式 B（带 fixReportFile）：
 
@@ -146,7 +182,7 @@ python3 "${CODEX_HOME:-$HOME/.codex}/skills/pr-review-loop/scripts/pr_review_agg
 
 ## fixFile 结构（补充说明）
 
-脚本在模式 A 下生成的 fixFile 分为两段：
+脚本在模式 A 下根据你提供的聚合结果生成 fixFile，分为两段：
 
 - `## IssuesToFix`：只包含 P0/P1（必须修）
 - `## OptionalIssues`：包含 P2/P3（由 fixer 自主决定是否修复，或拒绝并说明原因）

@@ -48,6 +48,10 @@ _parse_review_findings = cast(
     Callable[[str], list[dict[str, object]]],
     getattr(_pr_review_aggregate, "_parse_review_findings"),
 )
+_parse_aggregate_result_json = cast(
+    Callable[[str], dict[str, object] | None],
+    getattr(_pr_review_aggregate, "_parse_aggregate_result_json"),
+)
 _check_existing_comment = cast(
     Callable[[int, str, int, str], bool],
     getattr(_pr_review_aggregate, "_check_existing_comment"),
@@ -560,6 +564,127 @@ def test_parse_review_findings_keeps_legacy_list_format() -> None:
     assert len(result) == 1
     assert result[0]["id"] == "LOG-001"
     assert result[0]["priority"] == "P1"
+
+
+# ============================================================
+# Test: _parse_aggregate_result_json()
+# ============================================================
+
+def test_parse_aggregate_result_json_valid() -> None:
+    """模型给出的聚合结果应被脚本按结构化数据接收。"""
+    raw = json.dumps(
+        {
+            "stop": False,
+            "mustFixFindings": [
+                {
+                    "id": "SEC-001",
+                    "priority": "P1",
+                    "category": "bug",
+                    "file": "apps/api/src/service.ts",
+                    "line": "10",
+                    "title": "标题",
+                    "description": "描述",
+                    "suggestion": "建议",
+                }
+            ],
+            "optionalFindings": [
+                {
+                    "id": "STY-002",
+                    "priority": "P3",
+                    "category": "quality",
+                    "file": "apps/web/src/page.tsx",
+                    "line": "22",
+                    "title": "样式建议",
+                    "description": "描述",
+                    "suggestion": "建议",
+                }
+            ],
+        },
+        ensure_ascii=True,
+    )
+
+    result = _parse_aggregate_result_json(raw)
+
+    assert result is not None
+    assert result["stop"] is False
+    assert len(cast(list[dict[str, object]], result["mustFixFindings"])) == 1
+    assert len(cast(list[dict[str, object]], result["optionalFindings"])) == 1
+
+
+def test_parse_aggregate_result_json_rejects_missing_required_fields() -> None:
+    """缺关键字段时必须失败，不能静默降级成 stop=true。"""
+    raw = json.dumps(
+        {
+            "stop": False,
+            "mustFixFindings": [
+                {
+                    "id": "SEC-001",
+                    "file": "apps/api/src/service.ts",
+                    "line": "10",
+                    "title": "标题",
+                    "description": "描述",
+                    "suggestion": "建议",
+                }
+            ],
+            "optionalFindings": [],
+        },
+        ensure_ascii=True,
+    )
+
+    result = _parse_aggregate_result_json(raw)
+    assert result is None
+
+
+def test_parse_aggregate_result_json_rejects_stop_true_with_must_fix() -> None:
+    """stop=true 时不允许同时带 must-fix，避免协议自相矛盾。"""
+    raw = json.dumps(
+        {
+            "stop": True,
+            "mustFixFindings": [
+                {
+                    "id": "SEC-009",
+                    "priority": "P0",
+                    "category": "bug",
+                    "file": "apps/api/src/service.ts",
+                    "line": "99",
+                    "title": "标题",
+                    "description": "描述",
+                    "suggestion": "建议",
+                }
+            ],
+            "optionalFindings": [],
+        },
+        ensure_ascii=True,
+    )
+
+    result = _parse_aggregate_result_json(raw)
+    assert result is None
+
+
+def test_parse_aggregate_result_json_rejects_wrong_bucket_priority() -> None:
+    """must-fix 与 optional 的优先级分桶必须严格一致。"""
+    raw = json.dumps(
+        {
+            "stop": False,
+            "mustFixFindings": [
+                {
+                    "id": "STY-010",
+                    "priority": "P2",
+                    "category": "quality",
+                    "file": "apps/api/src/service.ts",
+                    "line": "12",
+                    "title": "标题",
+                    "description": "描述",
+                    "suggestion": "建议",
+                }
+            ],
+            "optionalFindings": [],
+        },
+        ensure_ascii=True,
+    )
+
+    result = _parse_aggregate_result_json(raw)
+    assert result is None
 
 
 # ============================================================

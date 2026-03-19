@@ -19,3 +19,50 @@
 5. 外部访问：SSRF、回调 URL 白名单、内网地址探测、协议滥用。
 6. 密钥与配置：密钥硬编码、日志泄漏、弱加密、签名与验签不一致。
 7. 高危优先级：可直接导致数据泄漏、权限提升、远程执行的，优先判为 P0/P1。
+8. 且项目正常情况下没有特殊说明都是硬切换,所以不需要考虑兼容性问题。
+
+## 输出格式（强制）
+
+- 必须把最终审查结果写入 `reviewFile`，禁止只在 stdout 输出结论。
+- 先完成审查，再按下面固定骨架生成文件；字段名必须逐字一致，禁止换同义词。
+- 若无问题，`reviewFile` 内容必须严格使用以下模板：
+
+```md
+# Review (SEC)
+PR: <PR_NUMBER>
+Round: <ROUND>
+RunId: <RUN_ID>
+
+## Findings
+None
+```
+
+- 若有问题，`reviewFile` 内容必须严格使用以下模板；每个 finding 之间空一行，禁止列表嵌套、表格、额外总结段落或代码块：
+
+```md
+# Review (SEC)
+PR: <PR_NUMBER>
+Round: <ROUND>
+RunId: <RUN_ID>
+
+## Findings
+id: SEC-001
+priority: P1
+category: bug
+file: apps/backend/src/example.ts
+line: 123
+title: 标题
+description: 描述
+suggestion: 建议
+```
+
+- `id` 前缀必须为 `SEC-`，编号从 `001` 开始递增。
+- `priority` 只能是 `P0`、`P1`、`P2`、`P3`。
+- `category` 使用英文小写单词或短语，如 `bug`、`auth`、`injection`。
+- `file` 必须是仓库相对路径。
+- `line` 必须是单个数字；无法确定时写 `null`。
+- 所有字段都必须非空；`description` 只写问题本身，`suggestion` 只写修复建议。
+- 输出前必须自检：
+  - 文件头中的 `PR`、`Round`、`RunId` 与输入一致。
+  - 每个 finding 字段齐全。
+  - `id` 前缀与 `ROLE_CODE` 一致。

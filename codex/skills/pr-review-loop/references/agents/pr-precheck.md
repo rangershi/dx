@@ -20,6 +20,9 @@
 - 项目根目录必须存在 `./reviewer/` 目录。
 - `./reviewer/` 下必须至少有一个 `*-reviewer.md` 文件。
 - 每个 `*-reviewer.md` 文件都必须包含 `ROLE_CODE = <CODE>`（例如 `ROLE_CODE = STY`）。
+- 必须执行：
+- `python3 "${CODEX_HOME:-$HOME/.codex}/skills/pr-review-loop/scripts/validate_reviewer_prompts.py" ./reviewer/*-reviewer.md`
+- 若脚本返回非零或输出 `ok != true`，视为 reviewer 输出契约不合法。
 - 若上述任一条件不满足，立即终止并返回：`{"error":"REVIEWER_CONFIG_INVALID","detail":"..."}`。
 
 2. 参数校验
