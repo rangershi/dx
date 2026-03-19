@@ -338,6 +338,11 @@
         "ecosystemConfig": "ecosystem.config.cjs",
         "pm2Bin": "pnpm pm2",
         "services": ["backend", "front", "admin"],
+        "urls": {
+          "backend": "http://localhost:3000",
+          "front": "http://localhost:3001",
+          "admin": "http://localhost:3500"
+        },
         "preflight": {
           "pm2Reset": true,
           "killPorts": [3000, 3001, 3500],
