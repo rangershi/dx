@@ -34,3 +34,12 @@ __pycache__/
 /.idea/nx-angular-config.xml
 /.idea/compiler.xml
 /.omc/
+/.superset/config.json
+/.omx/hud-config.json
+/.omx/state/hud-state.json
+/.omx/metrics.json
+/.omx/state/notify-hook-state.json
+/.omx/setup-scope.json
+/.omx/state/team-leader-nudge.json
+/.omx/state/tmux-hook-state.json
+/.omx/logs/turns-2026-03-31.jsonl
