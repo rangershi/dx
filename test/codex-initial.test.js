@@ -28,116 +28,57 @@ describe('runCodexInitial', () => {
     jest.restoreAllMocks()
   })
 
-test('copies codex skills and agents into ~/.codex with merge-overwrite semantics', async () => {
-    mkdirSync(join(packageRoot, 'codex/skills/skill-a/references'), { recursive: true })
-    mkdirSync(join(packageRoot, 'codex/skills/skill-b/agents'), { recursive: true })
-    mkdirSync(join(packageRoot, 'codex/agents/reviewer/prompts'), { recursive: true })
-    mkdirSync(join(packageRoot, 'codex/agents/fixer'), { recursive: true })
-    writeFileSync(join(packageRoot, 'codex/skills/skill-a/SKILL.md'), '# new skill a')
-    writeFileSync(join(packageRoot, 'codex/skills/skill-a/config.yaml'), 'k: new')
-    writeFileSync(join(packageRoot, 'codex/skills/skill-a/references/readme.md'), 'new ref')
-    writeFileSync(join(packageRoot, 'codex/skills/skill-b/agents/openai.yaml'), 'model: gpt')
-    writeFileSync(join(packageRoot, 'codex/agents/reviewer/SYSTEM.md'), '# new reviewer')
-    writeFileSync(join(packageRoot, 'codex/agents/reviewer/prompts/base.md'), 'new reviewer prompt')
-    writeFileSync(join(packageRoot, 'codex/agents/fixer/SYSTEM.md'), '# new fixer')
+  test('copies root skills into ~/.codex/skills and ~/.claude/skills with merge-overwrite semantics', async () => {
+    mkdirSync(join(packageRoot, 'skills', 'skill-a', 'references'), { recursive: true })
+    mkdirSync(join(packageRoot, 'skills', 'skill-b', 'agents'), { recursive: true })
+    writeFileSync(join(packageRoot, 'skills', 'skill-a', 'SKILL.md'), '# new skill a')
+    writeFileSync(join(packageRoot, 'skills', 'skill-a', 'config.yaml'), 'k: new')
+    writeFileSync(join(packageRoot, 'skills', 'skill-a', 'references', 'readme.md'), 'new ref')
+    writeFileSync(join(packageRoot, 'skills', 'skill-b', 'agents', 'openai.yaml'), 'model: gpt')
 
-    mkdirSync(join(homeDir, '.codex/skills/skill-a/references'), { recursive: true })
-    mkdirSync(join(homeDir, '.codex/skills/skill-existing-only'), { recursive: true })
-    mkdirSync(join(homeDir, '.codex/agents/reviewer/prompts'), { recursive: true })
-    mkdirSync(join(homeDir, '.codex/agents/existing-only'), { recursive: true })
-    writeFileSync(join(homeDir, '.codex/skills/skill-a/SKILL.md'), '# old skill a')
-    writeFileSync(join(homeDir, '.codex/skills/skill-a/references/keep.md'), 'keep me')
-    writeFileSync(join(homeDir, '.codex/skills/skill-existing-only/SKILL.md'), '# existing only')
-    writeFileSync(join(homeDir, '.codex/agents/reviewer/SYSTEM.md'), '# old reviewer')
-    writeFileSync(join(homeDir, '.codex/agents/reviewer/prompts/keep.md'), 'keep reviewer prompt')
-    writeFileSync(join(homeDir, '.codex/agents/existing-only/SYSTEM.md'), '# existing-only agent')
+    mkdirSync(join(homeDir, '.codex', 'skills', 'skill-a', 'references'), { recursive: true })
+    mkdirSync(join(homeDir, '.codex', 'skills', 'skill-existing-only'), { recursive: true })
+    writeFileSync(join(homeDir, '.codex', 'skills', 'skill-a', 'SKILL.md'), '# old skill a')
+    writeFileSync(join(homeDir, '.codex', 'skills', 'skill-a', 'references', 'keep.md'), 'keep me')
+    writeFileSync(join(homeDir, '.codex', 'skills', 'skill-existing-only', 'SKILL.md'), '# existing only')
+
+    mkdirSync(join(homeDir, '.claude', 'skills', 'skill-a', 'references'), { recursive: true })
+    mkdirSync(join(homeDir, '.claude', 'skills', 'skill-existing-only'), { recursive: true })
+    writeFileSync(join(homeDir, '.claude', 'skills', 'skill-a', 'SKILL.md'), '# old claude skill a')
+    writeFileSync(join(homeDir, '.claude', 'skills', 'skill-a', 'references', 'keep.md'), 'keep claude')
+    writeFileSync(join(homeDir, '.claude', 'skills', 'skill-existing-only', 'SKILL.md'), '# existing claude only')
 
     await runCodexInitial({ packageRoot, homeDir })
 
-    expect(readFileSync(join(homeDir, '.codex/skills/skill-a/SKILL.md'), 'utf8')).toBe('# new skill a')
-    expect(readFileSync(join(homeDir, '.codex/skills/skill-a/config.yaml'), 'utf8')).toBe('k: new')
-    expect(readFileSync(join(homeDir, '.codex/skills/skill-a/references/readme.md'), 'utf8')).toBe('new ref')
-    expect(readFileSync(join(homeDir, '.codex/skills/skill-b/agents/openai.yaml'), 'utf8')).toBe('model: gpt')
+    expect(readFileSync(join(homeDir, '.codex', 'skills', 'skill-a', 'SKILL.md'), 'utf8')).toBe('# new skill a')
+    expect(readFileSync(join(homeDir, '.codex', 'skills', 'skill-a', 'config.yaml'), 'utf8')).toBe('k: new')
+    expect(readFileSync(join(homeDir, '.codex', 'skills', 'skill-a', 'references', 'readme.md'), 'utf8')).toBe('new ref')
+    expect(readFileSync(join(homeDir, '.codex', 'skills', 'skill-b', 'agents', 'openai.yaml'), 'utf8')).toBe('model: gpt')
+    expect(readFileSync(join(homeDir, '.codex', 'skills', 'skill-a', 'references', 'keep.md'), 'utf8')).toBe('keep me')
+    expect(readFileSync(join(homeDir, '.codex', 'skills', 'skill-existing-only', 'SKILL.md'), 'utf8')).toBe('# existing only')
 
-    expect(readFileSync(join(homeDir, '.codex/skills/skill-a/references/keep.md'), 'utf8')).toBe('keep me')
-    expect(readFileSync(join(homeDir, '.codex/skills/skill-existing-only/SKILL.md'), 'utf8')).toBe('# existing only')
-
-    expect(readFileSync(join(homeDir, '.codex/agents/reviewer/SYSTEM.md'), 'utf8')).toBe('# new reviewer')
-    expect(readFileSync(join(homeDir, '.codex/agents/reviewer/prompts/base.md'), 'utf8')).toBe('new reviewer prompt')
-    expect(readFileSync(join(homeDir, '.codex/agents/fixer/SYSTEM.md'), 'utf8')).toBe('# new fixer')
-
-    expect(readFileSync(join(homeDir, '.codex/agents/reviewer/prompts/keep.md'), 'utf8')).toBe('keep reviewer prompt')
-    expect(readFileSync(join(homeDir, '.codex/agents/existing-only/SYSTEM.md'), 'utf8')).toBe('# existing-only agent')
+    expect(readFileSync(join(homeDir, '.claude', 'skills', 'skill-a', 'SKILL.md'), 'utf8')).toBe('# new skill a')
+    expect(readFileSync(join(homeDir, '.claude', 'skills', 'skill-a', 'config.yaml'), 'utf8')).toBe('k: new')
+    expect(readFileSync(join(homeDir, '.claude', 'skills', 'skill-a', 'references', 'readme.md'), 'utf8')).toBe('new ref')
+    expect(readFileSync(join(homeDir, '.claude', 'skills', 'skill-b', 'agents', 'openai.yaml'), 'utf8')).toBe('model: gpt')
+    expect(readFileSync(join(homeDir, '.claude', 'skills', 'skill-a', 'references', 'keep.md'), 'utf8')).toBe('keep claude')
+    expect(readFileSync(join(homeDir, '.claude', 'skills', 'skill-existing-only', 'SKILL.md'), 'utf8')).toBe('# existing claude only')
   })
 
-  test('throws when codex skills directory is missing', async () => {
-    await expect(runCodexInitial({ packageRoot, homeDir })).rejects.toThrow('模板目录 codex/skills')
-
-    expect(existsSync(join(homeDir, '.codex/skills'))).toBe(false)
-  })
-
-  test('creates ~/.codex/config.toml with required codex settings when missing', async () => {
-    mkdirSync(join(packageRoot, 'codex/skills/skill-a'), { recursive: true })
-    mkdirSync(join(packageRoot, 'codex/agents'), { recursive: true })
-    writeFileSync(join(packageRoot, 'codex/skills/skill-a/SKILL.md'), '# skill a')
-    writeFileSync(join(packageRoot, 'codex/agents/fixer.toml'), 'model = "gpt"')
+  test('creates ~/.codex/skills and ~/.claude/skills when missing', async () => {
+    mkdirSync(join(packageRoot, 'skills', 'skill-a'), { recursive: true })
+    writeFileSync(join(packageRoot, 'skills', 'skill-a', 'SKILL.md'), '# skill a')
 
     await runCodexInitial({ packageRoot, homeDir })
 
-    const configToml = readFileSync(join(homeDir, '.codex/config.toml'), 'utf8')
-
-    expect(configToml).toContain('[features]')
-    expect(configToml).toContain('multi_agent = true')
-    expect(configToml).toContain('[agents]')
-    expect(configToml).toContain('max_threads = 15')
-    expect(configToml).toContain('[agents.fixer]')
-    expect(configToml).toContain('description = "bugfix 代理"')
-    expect(configToml).toContain('config_file = "agents/fixer.toml"')
-    expect(configToml).toContain('[agents.orchestrator]')
-    expect(configToml).toContain('config_file = "agents/orchestrator.toml"')
-    expect(configToml).toContain('[agents.reviewer]')
-    expect(configToml).toContain('config_file = "agents/reviewer.toml"')
-    expect(configToml).toContain('[agents.spark]')
-    expect(configToml).toContain('config_file = "agents/spark.toml"')
+    expect(existsSync(join(homeDir, '.codex', 'skills', 'skill-a', 'SKILL.md'))).toBe(true)
+    expect(existsSync(join(homeDir, '.claude', 'skills', 'skill-a', 'SKILL.md'))).toBe(true)
   })
 
-  test('repairs required codex settings while preserving unrelated config', async () => {
-    mkdirSync(join(packageRoot, 'codex/skills/skill-a'), { recursive: true })
-    mkdirSync(join(packageRoot, 'codex/agents'), { recursive: true })
-    mkdirSync(join(homeDir, '.codex'), { recursive: true })
-    writeFileSync(join(packageRoot, 'codex/skills/skill-a/SKILL.md'), '# skill a')
-    writeFileSync(join(packageRoot, 'codex/agents/fixer.toml'), 'model = "gpt"')
-    writeFileSync(
-      join(homeDir, '.codex/config.toml'),
-      [
-        '[features]',
-        'multi_agent = false',
-        '',
-        '[agents]',
-        'max_threads = 3',
-        '',
-        '[agents.fixer]',
-        'description = "old fixer"',
-        'config_file = "agents/old.toml"',
-        '',
-        '[ui]',
-        'theme = "dark"',
-        '',
-      ].join('\n'),
-    )
+  test('throws when root skills directory is missing', async () => {
+    await expect(runCodexInitial({ packageRoot, homeDir })).rejects.toThrow('模板目录 skills')
 
-    await runCodexInitial({ packageRoot, homeDir })
-
-    const configToml = readFileSync(join(homeDir, '.codex/config.toml'), 'utf8')
-
-    expect(configToml).toContain('multi_agent = true')
-    expect(configToml).toContain('max_threads = 15')
-    expect(configToml).toContain('description = "bugfix 代理"')
-    expect(configToml).toContain('config_file = "agents/fixer.toml"')
-    expect(configToml).toContain('[ui]')
-    expect(configToml).toContain('theme = "dark"')
-    expect(configToml).toContain('[agents.orchestrator]')
-    expect(configToml).toContain('[agents.reviewer]')
-    expect(configToml).toContain('[agents.spark]')
+    expect(existsSync(join(homeDir, '.codex', 'skills'))).toBe(false)
+    expect(existsSync(join(homeDir, '.claude', 'skills'))).toBe(false)
   })
 })
