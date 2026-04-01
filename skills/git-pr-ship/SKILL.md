@@ -1,6 +1,6 @@
 ---
-name: pr-ship
-description: 代码提交、PR 创建与多轮审查修复的完整交付流程。当用户完成代码修改并准备提交仓库时使用——包括创建 Issue、功能分支、Commit、PR，随后自动执行构建/Lint/测试验证和双源代码审查，逐项修复问题并提交，最多进行三轮审查直到所有问题解决。适用于以下场景：代码改完准备提交、需要自动审查和修复循环、需要一键完成从 commit 到 review 的全流程。关键词：pr-ship、提交审查、ship it、提交并审查。
+name: git-pr-ship
+description: PR 交付流程（仅限显式调用）
 ---
 
 # PR Ship — 提交 · 审查 · 修复 · 交付

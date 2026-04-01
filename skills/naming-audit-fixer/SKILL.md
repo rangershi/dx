@@ -1,5 +1,5 @@
 ---
-name: naming-convention-audit
+name: naming-audit-fixer
 description: 审计并修复任意 JS/TS 项目的文件和文件夹命名规范。由模型判断框架、源码目录和自定义约定，再调用脚本执行扫描。当用户提到"命名规范"、"文件命名检查"、"naming convention"、"rename files"、"文件名不规范"、"命名审计"，或讨论文件/文件夹命名最佳实践时触发。即使用户只是问"检查一下命名"也应触发。
 ---
 
@@ -63,7 +63,7 @@ echo '{
       "extra_ok_files": []
     }
   ]
-}' | python ~/.claude/skills/naming-convention-audit/scripts/audit_naming.py
+}' | python ~/.claude/skills/naming-audit-fixer/scripts/audit_naming.py
 ```
 
 **配置字段说明：**
