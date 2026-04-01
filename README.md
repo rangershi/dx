@@ -148,8 +148,8 @@ target（端）不写死，由 `env-policy.jsonc.targets` 定义；`commands.jso
 
 技能入口与说明见：
 
-- `codex/skills/pr-review-loop/SKILL.md`
-- `codex/skills/pr-review-loop/references/agents/*.md`
+- `skills/pr-review-loop/SKILL.md`
+- `skills/pr-review-loop/references/agents/*.md`
 
 ### 工作流概览
 
