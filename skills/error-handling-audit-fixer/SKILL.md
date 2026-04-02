@@ -9,23 +9,76 @@ description: Use when backend、NestJS、领域异常治理或错误处理审查
 
 先判断项目是否已经具备统一错误处理基础设施，再扫描业务代码是否绕过 `DomainException` / `ErrorCode` 体系。默认只输出审计结果和修复建议，不自动改代码；只有用户明确要求时才进入自动修复。
 
+## 扫描范围
+
+脚本不预设任何项目路径，需要通过 `--src-dir` / `--e2e-dir` 显式传入。执行前必须先完成项目探索（见下方步骤 0）。
+
+以下路径/后缀始终排除，不会产生误报：
+
+| 排除类别 | 路径/后缀 |
+|----------|-----------|
+| 单元测试 | `*.spec.ts`、`*.test.ts`、`*.e2e-spec.ts` |
+| 测试辅助 | `*.mock.ts`、`*.stub.ts`、`*.fixture.ts`、`fixtures/`、`test-utils/`、`testing/`、`__tests__/`、`__test__/` |
+| 基础设施 | `*/filters/`、`prisma/`、`scripts/` |
+| 异常定义 | `*.exception.ts` |
+| 入口文件 | `main.ts` |
+
+只有在用户**明确要求**评估测试债务时，才传 `--e2e-dir` + `--scope e2e` 扫描测试代码。
+
 ## 快速开始
 
-1. 先审计生产代码：
+### 步骤 0：项目探索（每个项目首次执行时必须完成）
+
+在调用脚本前，先探索项目结构，识别出后端生产代码和测试代码的实际路径。方法：
+
+1. 查看项目根目录结构（`ls` 或 Glob）
+2. 识别后端应用目录（可能是 `apps/backend/src`、`src`、`server/src` 等）
+3. 识别测试目录（可能是 `apps/backend/e2e`、`test`、`e2e`、`__tests__` 等）
+4. 如果是 monorepo，可能有多个后端服务，每个都需要单独传 `--src-dir`
+
+典型示例：
+
+| 项目类型 | 生产代码 | 测试代码 |
+|----------|----------|----------|
+| NestJS monorepo | `apps/backend/src` | `apps/backend/e2e` |
+| 单体 NestJS | `src` | `test` 或 `e2e` |
+| 多服务 monorepo | `apps/api/src`、`apps/worker/src` | `apps/api/e2e`、`apps/worker/e2e` |
+
+### 步骤 1：审计生产代码
+
+将探索到的路径传给脚本（`--src-dir` 可传多个）：
 
 ```bash
-CODEX_HOME="${CODEX_HOME:-$HOME/.codex}"
-python "$CODEX_HOME/skills/error-handling-audit-fixer/scripts/error_handling_audit.py" \
+SKILL_HOME="${SKILL_HOME:-$HOME/.claude/skills}"
+python "$SKILL_HOME/error-handling-audit-fixer/scripts/error_handling_audit.py" \
   --workspace "$PWD" \
-  --scope src
+  --src-dir <探索到的生产代码路径>
 ```
 
-2. 再按需审计 E2E 或全量：
+示例（当前项目）：
 
 ```bash
-python "$CODEX_HOME/skills/error-handling-audit-fixer/scripts/error_handling_audit.py" \
+python "$SKILL_HOME/error-handling-audit-fixer/scripts/error_handling_audit.py" \
   --workspace "$PWD" \
-  --scope all \
+  --src-dir apps/backend/src
+```
+
+多服务示例：
+
+```bash
+python "$SKILL_HOME/error-handling-audit-fixer/scripts/error_handling_audit.py" \
+  --workspace "$PWD" \
+  --src-dir apps/api/src \
+  --src-dir apps/worker/src
+```
+
+### 步骤 2：（仅在用户明确要求时）审计测试代码
+
+```bash
+python "$SKILL_HOME/error-handling-audit-fixer/scripts/error_handling_audit.py" \
+  --workspace "$PWD" \
+  --e2e-dir <探索到的测试代码路径> \
+  --scope e2e \
   --output-json /tmp/error-handling-audit.json
 ```
 
@@ -37,7 +90,7 @@ python "$CODEX_HOME/skills/error-handling-audit-fixer/scripts/error_handling_aud
 
 ## 执行流程
 
-1. 默认先扫描 `apps/backend/src`，只有在用户明确要求或需要评估测试债务时再扫描 `apps/backend/e2e`。
+1. 默认只扫描 `apps/backend/src`（生产代码）。测试代码、E2E、prisma seed、脚本等非生产路径全部排除。只有在用户明确要求评估测试债务时，才传 `--scope e2e` 扫描测试代码。
 2. 先判断基础设施状态：
    - 是否存在 `DomainException`
    - 是否存在 `ErrorCode`
@@ -56,47 +109,31 @@ python "$CODEX_HOME/skills/error-handling-audit-fixer/scripts/error_handling_aud
 6. 只有在用户明确说“自动修复”“直接改”或等价表述时，才进入落代码阶段。
 7. 若脚本结果与实际代码不一致，必须抽样打开命中文件复核，不要把脚本结果当成绝对真相。
 
-## 审计命令
+## 审计命令（rg 快速复核）
 
-项目具备 ripgrep 时，可先用下列命令快速复核：
+以下 rg 命令用于手工复核，将 `<SRC_DIR>` 替换为步骤 0 探索到的实际路径：
 
 ```bash
 rg "new (BadRequestException|UnauthorizedException|ForbiddenException|NotFoundException|HttpException|InternalServerErrorException)\(" \
-  apps/backend/src apps/backend/e2e \
-  --glob '!*spec.ts' \
+  <SRC_DIR> \
+  --glob '!*spec.ts' --glob '!*test.ts' \
   --glob '!*exception.ts' \
-  --glob '!apps/backend/src/common/filters/**' \
-  --glob '!apps/backend/src/main.ts'
+  --glob '!*/filters/**' \
+  --glob '!*main.ts'
 ```
 
 ```bash
-rg "new Error\(" apps/backend/src apps/backend/e2e --glob '!*spec.ts'
+rg "new Error\(" <SRC_DIR> --glob '!*spec.ts' --glob '!*test.ts'
 ```
 
 ```bash
-rg "new DomainException\([^)]*$" -A3 apps/backend/src
+rg "new DomainException\([^)]*$" -A3 <SRC_DIR>
 ```
 
 ```bash
-rg "DomainException\([^)]*[\u4e00-\u9fa5]" apps/backend/src apps/backend/e2e \
+rg "DomainException\([^)]*[\u4e00-\u9fa5]" <SRC_DIR> \
   --glob '!*spec.ts' \
-  --glob '!apps/backend/src/common/exceptions/**'
-```
-
-如果只想快速看生产代码，可优先改成：
-
-```bash
-python "$CODEX_HOME/skills/error-handling-audit-fixer/scripts/error_handling_audit.py" \
-  --workspace "$PWD" \
-  --scope src
-```
-
-如果只想看 E2E 存量问题，可改成：
-
-```bash
-python "$CODEX_HOME/skills/error-handling-audit-fixer/scripts/error_handling_audit.py" \
-  --workspace "$PWD" \
-  --scope e2e
+  --glob '!*/common/exceptions/**'
 ```
 
 ## 修复准则

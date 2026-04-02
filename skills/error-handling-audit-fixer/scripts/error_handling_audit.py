@@ -60,16 +60,34 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="审计后端错误处理是否绕过 DomainException / ErrorCode 体系")
     parser.add_argument("--workspace", required=True, help="仓库根目录")
     parser.add_argument(
-        "--include-glob",
+        "--src-dir",
         action="append",
         default=None,
-        help="附加扫描 glob，可重复传入",
+        help="生产代码目录（相对于 workspace，可重复），如 apps/backend/src",
+    )
+    parser.add_argument(
+        "--e2e-dir",
+        action="append",
+        default=None,
+        help="测试代码目录（相对于 workspace，可重复），如 apps/backend/e2e",
     )
     parser.add_argument(
         "--scope",
         choices=["all", "src", "e2e"],
-        default="all",
-        help="预设扫描范围：all=src+e2e，src=仅生产代码，e2e=仅测试代码",
+        default="src",
+        help="扫描范围：src=仅生产代码（默认），e2e=仅测试代码，all=src+e2e",
+    )
+    parser.add_argument(
+        "--include-glob",
+        action="append",
+        default=None,
+        help="附加扫描 glob（覆盖自动推导），可重复传入",
+    )
+    parser.add_argument(
+        "--exclude-pattern",
+        action="append",
+        default=None,
+        help="额外排除路径片段（可重复），如 prisma/ scripts/",
     )
     parser.add_argument("--output-json", help="输出 JSON 文件路径")
     parser.add_argument(
@@ -95,18 +113,44 @@ def iter_files(workspace: Path, globs: Iterable[str]) -> list[Path]:
     return sorted(files)
 
 
-def should_skip(path: Path) -> bool:
+SKIP_SUFFIXES = (
+    ".spec.ts",
+    ".test.ts",
+    ".e2e-spec.ts",
+    ".exception.ts",
+    ".mock.ts",
+    ".stub.ts",
+    ".fixture.ts",
+)
+
+SKIP_DIR_FRAGMENTS = (
+    "__tests__/",
+    "__test__/",
+    "test-utils/",
+    "testing/",
+    "fixtures/",
+    "/filters/",
+    "prisma/",
+    "scripts/",
+)
+
+SKIP_FILENAMES = ("main.ts",)
+
+
+def should_skip(path: Path, extra_excludes: list[str] | None = None) -> bool:
     path_text = path.as_posix()
-    if path_text.endswith(".spec.ts"):
+    if path.name in SKIP_FILENAMES:
         return True
-    if path_text.endswith(".exception.ts"):
-        return True
-    if path_text == "apps/backend/src/main.ts":
-        return True
-    if path_text.startswith("apps/backend/src/common/filters/"):
-        return True
-    if path_text.startswith("apps/backend/src/common/exceptions/"):
-        return True
+    for suffix in SKIP_SUFFIXES:
+        if path_text.endswith(suffix):
+            return True
+    for fragment in SKIP_DIR_FRAGMENTS:
+        if fragment in path_text:
+            return True
+    if extra_excludes:
+        for pattern in extra_excludes:
+            if pattern in path_text:
+                return True
     return False
 
 
@@ -114,12 +158,14 @@ def line_no(content: str, index: int) -> int:
     return content.count("\n", 0, index) + 1
 
 
-def default_globs_for_scope(scope: str) -> list[str]:
+def build_globs(scope: str, src_dirs: list[str], e2e_dirs: list[str]) -> list[str]:
     if scope == "src":
-        return ["apps/backend/src/**/*.ts"]
-    if scope == "e2e":
-        return ["apps/backend/e2e/**/*.ts"]
-    return ["apps/backend/src/**/*.ts", "apps/backend/e2e/**/*.ts"]
+        dirs = src_dirs
+    elif scope == "e2e":
+        dirs = e2e_dirs
+    else:
+        dirs = src_dirs + e2e_dirs
+    return [f"{d}/**/*.ts" for d in dirs]
 
 
 def safe_read_text(path: Path) -> str:
@@ -284,30 +330,32 @@ def find_constructor_calls(content: str, constructor_name: str) -> list[tuple[in
     return matches
 
 
-def collect_foundation_status(workspace: Path) -> FoundationStatus:
-    backend_root = workspace / "apps/backend/src"
-    all_ts_files = sorted(backend_root.glob("**/*.ts"))
+def collect_foundation_status(workspace: Path, src_dirs: list[str]) -> FoundationStatus:
     has_domain_exception = False
     has_error_code = False
     has_exception_filters = False
     has_module_exceptions_dir = False
     has_structured_request_id_signal = False
 
-    for path in all_ts_files:
-        path_text = path.as_posix()
-        content = safe_read_text(path)
-        if not content:
+    for src_dir in src_dirs:
+        root = workspace / src_dir
+        if not root.is_dir():
             continue
-        if re.search(r"\bclass\s+DomainException\b", content):
-            has_domain_exception = True
-        if re.search(r"\b(enum|const)\s+ErrorCode\b", content) or re.search(r"\bErrorCode\.[A-Z0-9_]+\b", content):
-            has_error_code = True
-        if "/filters/" in path_text and re.search(r"ExceptionFilter|Catch\s*\(", content):
-            has_exception_filters = True
-        if "/exceptions/" in path_text and not path_text.startswith("apps/backend/src/common/exceptions/"):
-            has_module_exceptions_dir = True
-        if "requestId" in content and re.search(r"\b(args|code)\b", content):
-            has_structured_request_id_signal = True
+        for path in sorted(root.glob("**/*.ts")):
+            path_text = path.as_posix()
+            content = safe_read_text(path)
+            if not content:
+                continue
+            if re.search(r"\bclass\s+DomainException\b", content):
+                has_domain_exception = True
+            if re.search(r"\b(enum|const)\s+ErrorCode\b", content) or re.search(r"\bErrorCode\.[A-Z0-9_]+\b", content):
+                has_error_code = True
+            if "/filters/" in path_text and re.search(r"ExceptionFilter|Catch\s*\(", content):
+                has_exception_filters = True
+            if "/exceptions/" in path_text and "common/exceptions" not in path_text:
+                has_module_exceptions_dir = True
+            if "requestId" in content and re.search(r"\b(args|code)\b", content):
+                has_structured_request_id_signal = True
 
     return FoundationStatus(
         has_domain_exception=has_domain_exception,
@@ -506,9 +554,19 @@ def print_report(foundations: FoundationStatus, findings: list[Finding]) -> None
 def main() -> int:
     args = parse_args()
     workspace = Path(args.workspace).resolve()
-    globs = args.include_glob or default_globs_for_scope(args.scope)
-    files = [path for path in iter_files(workspace, globs) if not should_skip(path.relative_to(workspace))]
-    foundations = collect_foundation_status(workspace)
+
+    src_dirs: list[str] = args.src_dir or []
+    e2e_dirs: list[str] = args.e2e_dir or []
+    extra_excludes: list[str] | None = args.exclude_pattern
+
+    if not src_dirs and not e2e_dirs and not args.include_glob:
+        print("错误：必须通过 --src-dir 或 --e2e-dir 指定扫描目录，或通过 --include-glob 指定 glob 模式")
+        print("示例：--src-dir apps/backend/src --e2e-dir apps/backend/e2e")
+        return 1
+
+    globs = args.include_glob or build_globs(args.scope, src_dirs, e2e_dirs)
+    files = [path for path in iter_files(workspace, globs) if not should_skip(path.relative_to(workspace), extra_excludes)]
+    foundations = collect_foundation_status(workspace, src_dirs or e2e_dirs)
 
     findings: list[Finding] = []
     for path in files:

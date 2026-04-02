@@ -75,9 +75,13 @@ describe('runCodexInitial', () => {
     expect(existsSync(join(homeDir, '.claude', 'skills', 'skill-a', 'SKILL.md'))).toBe(true)
   })
 
-  test('removes deprecated skill directories before copying into target skills directories', async () => {
+  test('removes deprecated skill directories even when they exist in source and target skills directories', async () => {
     mkdirSync(join(packageRoot, 'skills', 'skill-a'), { recursive: true })
+    mkdirSync(join(packageRoot, 'skills', 'pr-review-loop'), { recursive: true })
+    mkdirSync(join(packageRoot, 'skills', 'git-commit-and-pr'), { recursive: true })
     writeFileSync(join(packageRoot, 'skills', 'skill-a', 'SKILL.md'), '# skill a')
+    writeFileSync(join(packageRoot, 'skills', 'pr-review-loop', 'SKILL.md'), '# source deprecated')
+    writeFileSync(join(packageRoot, 'skills', 'git-commit-and-pr', 'SKILL.md'), '# source deprecated')
 
     mkdirSync(join(homeDir, '.codex', 'skills', 'pr-review-loop'), { recursive: true })
     mkdirSync(join(homeDir, '.codex', 'skills', 'git-commit-and-pr'), { recursive: true })
