@@ -205,18 +205,6 @@ ensure_agent_browser() {
   fi
 }
 
-ensure_multi_agent() {
-  if ! command -v codex >/dev/null 2>&1; then
-    echo "codex 命令不存在" >&2
-    return 1
-  fi
-  codex features enable multi_agent >/dev/null 2>&1 || true
-  local line
-  line="$(codex features list 2>/dev/null | awk '$1=="multi_agent" {print $0}')"
-  [[ -n "$line" ]] || return 1
-  echo "$line" | grep -E "experimental[[:space:]]+true" >/dev/null 2>&1
-}
-
 force_dx() {
   local pnpm_bin dx_installed dx_cmd
   if ! install_pnpm; then
@@ -348,26 +336,12 @@ run_parallel_checks() {
     fi
   ) &
 
-  (
-    if command -v codex >/dev/null 2>&1; then
-      local line
-      line="$(codex features list 2>/dev/null | awk '$1=="multi_agent" {print $0}')"
-      if [[ -n "$line" ]] && echo "$line" | grep -E "experimental[[:space:]]+true" >/dev/null 2>&1; then
-        write_check_file "multi_agent" "1" "$line" "ok" "$dir/multi_agent.res"
-      else
-        write_check_file "multi_agent" "0" "${line:-missing}" "multi_agent 不是 experimental true" "$dir/multi_agent.res"
-      fi
-    else
-      write_check_file "multi_agent" "0" "" "codex 命令不存在" "$dir/multi_agent.res"
-    fi
-  ) &
-
   wait
   LAST_CHECK_DIR="$dir"
 }
 
 all_good() {
-  local keys="python3 python_alias pnpm dx agent_browser rg multi_agent"
+  local keys="python3 python_alias pnpm dx agent_browser rg"
   local k
   for k in $keys; do
     if ! check_ok "$k"; then
@@ -384,7 +358,7 @@ print_report() {
   printf '%-14s | %-4s | %-40s | %s\n' "检查项" "状态" "版本" "说明"
   printf '%-14s-+-%-4s-+-%-40s-+-%s\n' "--------------" "----" "----------------------------------------" "------------------------------"
 
-  local keys="python3 python_alias pnpm dx agent_browser rg multi_agent"
+  local keys="python3 python_alias pnpm dx agent_browser rg"
   local k ok txt ver msg
   for k in $keys; do
     ok="$(read_field "$k" 2)"
@@ -436,11 +410,6 @@ for round in $(seq 1 "$MAX_ROUNDS"); do
   else
     echo "[doctor] agent-browser 已存在，执行升级与 Chromium 安装"
     ensure_agent_browser || true
-  fi
-
-  if ! check_ok "multi_agent"; then
-    echo "[doctor] 修正 multi_agent 特性开关"
-    ensure_multi_agent || true
   fi
 
   echo "[doctor] 强制执行 dx 安装与初始化"
