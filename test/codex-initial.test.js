@@ -75,6 +75,35 @@ describe('runCodexInitial', () => {
     expect(existsSync(join(homeDir, '.claude', 'skills', 'skill-a', 'SKILL.md'))).toBe(true)
   })
 
+  test('removes deprecated skill directories before copying into target skills directories', async () => {
+    mkdirSync(join(packageRoot, 'skills', 'skill-a'), { recursive: true })
+    writeFileSync(join(packageRoot, 'skills', 'skill-a', 'SKILL.md'), '# skill a')
+
+    mkdirSync(join(homeDir, '.codex', 'skills', 'pr-review-loop'), { recursive: true })
+    mkdirSync(join(homeDir, '.codex', 'skills', 'git-commit-and-pr'), { recursive: true })
+    mkdirSync(join(homeDir, '.codex', 'skills', 'keep-skill'), { recursive: true })
+    writeFileSync(join(homeDir, '.codex', 'skills', 'pr-review-loop', 'SKILL.md'), '# deprecated')
+    writeFileSync(join(homeDir, '.codex', 'skills', 'git-commit-and-pr', 'SKILL.md'), '# deprecated')
+    writeFileSync(join(homeDir, '.codex', 'skills', 'keep-skill', 'SKILL.md'), '# keep')
+
+    mkdirSync(join(homeDir, '.claude', 'skills', 'pr-review-loop'), { recursive: true })
+    mkdirSync(join(homeDir, '.claude', 'skills', 'git-commit-and-pr'), { recursive: true })
+    mkdirSync(join(homeDir, '.claude', 'skills', 'keep-skill'), { recursive: true })
+    writeFileSync(join(homeDir, '.claude', 'skills', 'pr-review-loop', 'SKILL.md'), '# deprecated')
+    writeFileSync(join(homeDir, '.claude', 'skills', 'git-commit-and-pr', 'SKILL.md'), '# deprecated')
+    writeFileSync(join(homeDir, '.claude', 'skills', 'keep-skill', 'SKILL.md'), '# keep')
+
+    await runCodexInitial({ packageRoot, homeDir })
+
+    expect(existsSync(join(homeDir, '.codex', 'skills', 'pr-review-loop'))).toBe(false)
+    expect(existsSync(join(homeDir, '.codex', 'skills', 'git-commit-and-pr'))).toBe(false)
+    expect(readFileSync(join(homeDir, '.codex', 'skills', 'keep-skill', 'SKILL.md'), 'utf8')).toBe('# keep')
+
+    expect(existsSync(join(homeDir, '.claude', 'skills', 'pr-review-loop'))).toBe(false)
+    expect(existsSync(join(homeDir, '.claude', 'skills', 'git-commit-and-pr'))).toBe(false)
+    expect(readFileSync(join(homeDir, '.claude', 'skills', 'keep-skill', 'SKILL.md'), 'utf8')).toBe('# keep')
+  })
+
   test('throws when root skills directory is missing', async () => {
     await expect(runCodexInitial({ packageRoot, homeDir })).rejects.toThrow('模板目录 skills')
 
