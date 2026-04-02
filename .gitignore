@@ -43,3 +43,7 @@ __pycache__/
 /.omx/state/team-leader-nudge.json
 /.omx/state/tmux-hook-state.json
 /.omx/logs/turns-2026-03-31.jsonl
+/.omx/context/dynamic-cli-help-20260402T122756Z.md
+/.omx/state/ralph-progress.json
+/.omx/state/ralph-state.json
+/.omx/tmux-hook.json
