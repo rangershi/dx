@@ -1,178 +1,296 @@
-# dx example
+# dx Example
 
-这个目录是一个“最小可读”的 dx 接入示例，用于演示：
+这个目录是一份“可读、可抄、可改”的 `dx` 接入示例。
 
-- monorepo 需要满足的条件
-- `dx/config/*` 应该如何写
-- `.env.*` 的分层与校验规则
+它的目的不是展示所有能力，而是告诉同事：
 
-注意：这是示例配置，不保证开箱即用跑通（因为不同团队的 nx target/应用名称不同）。你应该按自己的 monorepo 调整 `commands.json` 里的命令。
+- `dx/config/*` 现在应该怎么写
+- 新项目接入时，最小需要改哪些地方
+- 当前 `dx` 只认什么规范，不再兼容什么旧写法
+
+## 这份 Example 的定位
+
+- 这是示例配置，不是完整业务项目。
+- 它展示的是当前推荐的 `dx` 配置结构。
+- 它只保留新规范，不保留任何旧兼容写法。
+
+这里采用的规范是：
+
+- 环境键只使用：
+  - `development`
+  - `staging`
+  - `production`
+  - `test`
+  - `e2e`
+- CLI 环境标志只使用：
+  - `--dev`
+  - `--staging`
+  - `--prod`
+  - `--test`
+  - `--e2e`
+
+不再建议也不再接受：
+
+- `dev` / `prod` 作为配置节点名
+- `--development` / `--production` / `--stage`
+- 任何自动回退到旧配置的行为
+
+如果配置不符合规范，`dx` 应该直接报错，而不是帮你兼容。
 
 ## 目录结构
 
-```
+```text
 example/
+  README.md
   dx/
     config/
       commands.json
       env-layers.json
       env-policy.jsonc
-  .env.development
-  .env.development.local
-  .env.production
-  .env.production.local
 ```
 
-## 快速体验（推荐全局安装）
+这三份配置分别负责：
+
+- [commands.json](/Users/a1/work/dx/example/dx/config/commands.json)
+  命令树、执行方式、帮助信息
+- [env-layers.json](/Users/a1/work/dx/example/dx/config/env-layers.json)
+  每个环境加载哪些 `.env` 文件
+- [env-policy.jsonc](/Users/a1/work/dx/example/dx/config/env-policy.jsonc)
+  环境变量布局、机密约束、required 校验
+
+## 最快体验方式
+
+在仓库根目录执行：
 
 ```bash
-pnpm add -g @ranger1/dx
-
-# 在任意目录执行，显式指定配置目录
-dx --config-dir /absolute/path/to/example/dx/config --help
-dx --config-dir /absolute/path/to/example/dx/config status
+node ./bin/dx.js --config-dir ./example/dx/config --help
+node ./bin/dx.js --config-dir ./example/dx/config help start
+node ./bin/dx.js --config-dir ./example/dx/config help build
 ```
 
-## commands.json 怎么写
+如果只是想理解配置结构，优先看帮助输出，不需要真的去跑业务命令。
 
-dx 的命令配置是一个 JSON 对象（不是代码）。通常会按命令名分组，例如：
+## `commands.json` 怎么理解
 
-- `start.*`：启动服务
-- `build.*`：构建
-- `db.*`：数据库
-- `deploy.*`：部署
+[commands.json](/Users/a1/work/dx/example/dx/config/commands.json) 是最核心的文件。
 
-其中 `start.stack` 可配置为 `internal: "pm2-stack"`，用于 PM2 交互式服务栈，并支持启动前自动清理端口占用与缓存目录。
-`deploy.backend` 也可配置为 `internal: "backend-artifact-deploy"`，用于“本地构建后端制品 + 上传远端 + 远端安装运行依赖并启动”的标准发布流程。
+它同时承载两类内容：
 
-示例（节选，完整见 `example/dx/config/commands.json`）：
+1. 命令执行配置
+2. 帮助输出配置
+
+### 1. 命令执行配置
+
+例如：
 
 ```json
 {
   "start": {
     "backend": {
       "command": "npx nx dev backend",
-      "app": "backend",
-      "ports": [3000]
+      "app": "backend"
     }
   },
   "build": {
     "backend": {
-      "dev": { "command": "npx nx build backend --configuration=development", "app": "backend" },
-      "prod": { "command": "npx nx build backend --configuration=production", "app": "backend" }
-    }
-  },
-  "test": {
-    "e2e": {
-      "backend": {
-        "command": "npx nx test:e2e backend",
-        "app": "backend",
-        "requiresPath": true,
-        "fileCommand": "npx nx test:e2e backend -- {TEST_PATH}"
+      "development": {
+        "command": "npx nx build backend --configuration=development",
+        "app": "backend"
+      },
+      "production": {
+        "command": "npx nx build backend --configuration=production",
+        "app": "backend"
       }
     }
   }
 }
 ```
 
-当某个 E2E target 配置了 `requiresPath: true` 时，`dx test e2e <target>` 只能按文件或目录增量执行。
-例如：`dx test e2e backend apps/backend/e2e/auth`。
-此时不支持 `dx test e2e <target>`、`dx test e2e <target> all` 或 `dx test e2e all` 这类全量运行。
+这表示：
 
-并发/串行编排示例：
+- `dx start backend --dev` 执行 `start.backend`
+- `dx build backend --dev` 执行 `build.backend.development`
+- `dx build backend --prod` 执行 `build.backend.production`
+
+### 2. 帮助输出配置
+
+例如：
 
 ```json
 {
-  "build": {
-    "all": {
-      "dev": {
-        "concurrent": true,
-        "commands": ["build.backend.dev", "build.front.dev"]
+  "help": {
+    "summary": "统一开发环境管理工具",
+    "commands": {
+      "start": {
+        "summary": "启动/桥接服务"
       }
     }
   }
 }
 ```
 
-backend 制品发布示例：
+这表示：
+
+- `dx --help`
+- `dx help start`
+
+不再由代码里的硬编码长文案生成，而是从配置动态渲染。
+
+## `commands.json` 的关键规则
+
+### 1. 环境分支必须写完整名
+
+要写：
 
 ```json
-{
-  "deploy": {
-    "backend": {
-      "internal": "backend-artifact-deploy",
-      "backendDeploy": {
-        "build": {
-          "app": "backend",
-          "distDir": "dist/backend",
-          "versionFile": "apps/backend/package.json",
-          "commands": {
-            "development": "npx nx build backend --configuration=development",
-            "staging": "npx nx build backend --configuration=production",
-            "production": "npx nx build backend --configuration=production"
-          }
-        },
-        "runtime": {
-          "appPackage": "apps/backend/package.json",
-          "rootPackage": "package.json",
-          "lockfile": "pnpm-lock.yaml",
-          "prismaSchemaDir": "apps/backend/prisma/schema",
-          "prismaConfig": "apps/backend/prisma.config.ts",
-          "ecosystemConfig": "ecosystem.config.cjs"
-        },
-        "artifact": {
-          "outputDir": "release/backend",
-          "bundleName": "backend-bundle"
-        },
-        "remote": {
-          "host": "deploy.example.com",
-          "port": 22,
-          "user": "deploy",
-          "baseDir": "/srv/example-app"
-        },
-        "startup": {
-          "mode": "pm2",
-          "serviceName": "backend"
-        }
-      }
-    }
-  }
-}
+"development": { ... }
+"staging": { ... }
+"production": { ... }
 ```
 
-常用命令：
+不要写：
+
+```json
+"dev": { ... }
+"prod": { ... }
+```
+
+### 2. 命令行入口统一用短标志
+
+命令行里统一写：
 
 ```bash
-dx deploy backend --prod
-dx deploy backend --build-only
-dx deploy backend --prod --skip-migration
+dx start backend --dev
+dx build backend --staging
+dx build backend --prod
+dx db migrate --dev --name init-user-table
 ```
 
-补充约束：
+### 3. 默认开发套件必须显式写在 `start.development`
 
-- release `package.json` 默认只带运行时依赖；如果 `prisma` 仅存在于应用 `devDependencies`，dx 会自动保留它，避免远端迁移阶段缺 CLI。
-- 打包前会递归拒绝任何层级的 `.env*` 文件进入制品。
-- 所有本地路径字段都会先约束在项目根目录内，不能通过 `../` 指向仓库外路径。
-- `remote.baseDir` 必须使用绝对路径，并且只允许 `/`、字母、数字、`.`、`_`、`-` 这些字符。
+这份 example 里保留了：
 
-## env-layers.json 怎么写
+```json
+"start": {
+  "development": {
+    "concurrent": true,
+    "commands": [
+      "start.backend",
+      "start.front"
+    ]
+  }
+}
+```
 
-`env-layers.json` 用于定义每个环境加载哪些 `.env.*` 文件：
+这样：
+
+- `dx start`
+- `dx start --dev`
+
+都会明确落到默认开发套件，而不是依赖任何旧兼容入口。
+
+### 4. `stack` 只支持 `dx start stack`
+
+这份 example 里演示的是：
+
+```bash
+dx start stack
+```
+
+不再依赖任何 `dx start stack front` / `stack admin` 这类兼容写法。
+
+### 5. 帮助示例必须与真实命令树一致
+
+帮助里写出来的示例，必须是当前配置真能支撑的命令。
+
+不要写：
+
+- 配置里没有的 target
+- 旧规范标志
+- 已删除的兼容入口
+
+## `env-layers.json` 怎么理解
+
+[env-layers.json](/Users/a1/work/dx/example/dx/config/env-layers.json) 只负责一件事：
+每个环境加载哪些 `.env` 文件。
+
+当前 example 是：
 
 ```json
 {
   "development": [".env.development", ".env.development.local"],
-  "production": [".env.production", ".env.production.local"]
+  "staging": [".env.staging", ".env.staging.local"],
+  "production": [".env.production", ".env.production.local"],
+  "test": [".env.test", ".env.test.local"],
+  "e2e": [".env.e2e", ".env.e2e.local"]
 }
 ```
 
-dx 会按顺序加载，并在执行命令时用 `pnpm exec dotenv ... -- <cmd>` 包裹（因此项目里需要安装 `dotenv-cli`）。
+含义很简单：
 
-## env-policy.jsonc
+- committed 文件放默认值/占位值
+- `.local` 文件放本机真实值
 
-`env-policy.jsonc` 是统一的 env 策略配置：
+## `env-policy.jsonc` 怎么理解
 
-- 机密 key：只能在 `.env.<env>.local` 放真实值；在 `.env.<env>` 中必须存在同名 key 且为占位符 `__SET_IN_env.local__`
-- 必填校验：按环境 + 按 target（端）定义 required keys
+[env-policy.jsonc](/Users/a1/work/dx/example/dx/config/env-policy.jsonc) 负责环境变量治理。
 
-示例配置见 `example/dx/config/env-policy.jsonc`。
+重点看这几块：
+
+- `environments`
+- `keys.secret`
+- `appToTarget`
+- `targets.*.required`
+
+它回答的是：
+
+1. 这个项目有哪些环境
+2. 哪些变量是机密
+3. 哪些变量在哪些环境必须存在
+4. `commands.json` 里的 `app` 应该映射到哪个 target
+
+## 常见接入方式
+
+如果同事要把这份 example 拿去改成自己项目的 `dx/config`，一般按这个顺序做：
+
+1. 先改 [commands.json](/Users/a1/work/dx/example/dx/config/commands.json)
+   把 app 名称、Nx target、启动/构建/部署命令改成项目自己的
+
+2. 再改 [env-policy.jsonc](/Users/a1/work/dx/example/dx/config/env-policy.jsonc)
+   把 `appToTarget`、`targets`、`required` 改成项目自己的变量规则
+
+3. 最后改 [env-layers.json](/Users/a1/work/dx/example/dx/config/env-layers.json)
+   如果项目的 `.env` 组织方式和 example 不同，再调整层级
+
+## 新增配置时怎么做
+
+### 新增一个命令 target
+
+例如新增 `build.worker`：
+
+1. 在 `commands.json` 中找到 `build`
+2. 新增 `worker`
+3. 明确写 `development` / `production` 分支
+4. 如果要展示帮助，再补 `help.commands.build` 或后续 `help.targets.build.worker`
+
+### 新增一个环境变量
+
+1. 先判断它属于哪个 target
+2. 更新 `env-policy.jsonc` 的 `targets.<target>.required`
+3. 如果它是机密，再加到 `keys.secret`
+
+### 新增一个帮助示例
+
+直接改 [commands.json](/Users/a1/work/dx/example/dx/config/commands.json) 的 `help` 区域，不要去改 CLI 代码。
+
+## 给同事的结论
+
+如果你要把 `dx` 接到新项目里，直接照着这份 example 配：
+
+- 命令树看 [commands.json](/Users/a1/work/dx/example/dx/config/commands.json)
+- 环境层看 [env-layers.json](/Users/a1/work/dx/example/dx/config/env-layers.json)
+- 环境变量治理看 [env-policy.jsonc](/Users/a1/work/dx/example/dx/config/env-policy.jsonc)
+
+不要再引入任何旧兼容写法。
+
+项目需要什么，就把配置写清楚；写错了就让 `dx` 直接报错，然后改配置。

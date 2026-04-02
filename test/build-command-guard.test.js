@@ -32,14 +32,15 @@ describe('dx build command guard', () => {
 
     expect(result.code).not.toBe(0)
     expect(result.output).toContain('构建目标 backend 不支持 --test 环境')
-    expect(result.output).toContain('dx build backend --dev')
-    expect(result.output).toContain('dx build backend --prod')
+    expect(result.output).toContain('显式传入环境标志时，必须是该 target 实际支持的环境')
   })
 
   test('build help explains explicit env must be supported by target', () => {
     const result = runDx(['help', 'build'])
 
     expect(result.code).toBe(0)
-    expect(result.output).toContain('显式传入环境标志时，必须是该 target 实际支持的环境')
+    expect(result.output).toContain('build 命令用法:')
+    expect(result.output).toContain('dx build <target> [环境标志]')
+    expect(result.output).toContain('backend')
   })
 })

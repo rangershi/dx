@@ -1,40 +1,132 @@
 {
-  "start": {
-    "backend": {
-      "dev": {
-        "command": "npx nx dev backend",
-        "app": "backend",
-        "ports": [3000],
+  "help": {
+    "summary": "dx demo 配置（严格新规范示例）",
+    "globalOptions": [
+      {
+        "flags": [
+          "--dev"
+        ],
+        "description": "使用 development 环境"
+      },
+      {
+        "flags": [
+          "--staging"
+        ],
+        "description": "使用 staging 环境"
+      },
+      {
+        "flags": [
+          "--prod"
+        ],
+        "description": "使用 production 环境"
+      }
+    ],
+    "examples": [
+      {
+        "command": "dx start backend --dev",
         "description": "启动后端开发服务"
       },
-      "prod": {
+      {
+        "command": "dx build all --prod",
+        "description": "构建全部示例应用"
+      }
+    ],
+    "commands": {
+      "start": {
+        "summary": "启动示例服务",
+        "notes": [
+          "未指定 service 时默认使用开发套件，仅允许 --dev"
+        ],
+        "examples": [
+          {
+            "command": "dx start backend --dev",
+            "description": "启动后端开发服务"
+          },
+          {
+            "command": "dx start stack",
+            "description": "启动 PM2 交互式服务栈"
+          }
+        ]
+      },
+      "build": {
+        "summary": "构建示例应用",
+        "examples": [
+          {
+            "command": "dx build backend --prod",
+            "description": "构建后端生产产物"
+          },
+          {
+            "command": "dx build all --dev",
+            "description": "并发构建 demo 中的全部应用"
+          }
+        ]
+      },
+      "db": {
+        "summary": "执行数据库相关操作",
+        "examples": [
+          {
+            "command": "dx db migrate --dev --name init-user-table",
+            "description": "创建开发环境迁移"
+          }
+        ]
+      }
+    }
+  },
+  "start": {
+    "backend": {
+      "development": {
+        "command": "npx nx dev backend",
+        "app": "backend",
+        "ports": [
+          3000
+        ],
+        "description": "启动后端开发服务"
+      },
+      "production": {
         "command": "npx nx start backend",
         "app": "backend",
         "description": "启动后端生产服务"
       }
     },
     "front": {
-      "dev": {
+      "development": {
         "command": "npx nx dev front",
         "app": "front",
-        "ports": [3001],
+        "ports": [
+          3001
+        ],
         "description": "启动前端开发服务"
       }
     },
     "admin": {
-      "dev": {
+      "development": {
         "command": "npx nx dev admin-front",
         "app": "admin-front",
-        "ports": [3500],
+        "ports": [
+          3500
+        ],
         "description": "启动管理后台开发服务"
       }
     },
     "all": {
-      "dev": {
+      "development": {
         "concurrent": true,
-        "commands": ["start.backend.dev", "start.front.dev", "start.admin.dev"],
+        "commands": [
+          "start.backend.development",
+          "start.front.development",
+          "start.admin.development"
+        ],
         "description": "并发启动 backend/front/admin"
       }
+    },
+    "development": {
+      "concurrent": true,
+      "commands": [
+        "start.backend.development",
+        "start.front.development",
+        "start.admin.development"
+      ],
+      "description": "默认开发套件"
     },
     "stack": {
       "internal": "pm2-stack",
@@ -43,10 +135,18 @@
       "stack": {
         "ecosystemConfig": "ecosystem.config.cjs",
         "pm2Bin": "pnpm pm2",
-        "services": ["backend", "front", "admin"],
+        "services": [
+          "backend",
+          "front",
+          "admin"
+        ],
         "preflight": {
           "pm2Reset": true,
-          "killPorts": [3000, 3001, 3500],
+          "killPorts": [
+            3000,
+            3001,
+            3500
+          ],
           "forcePortCleanup": true,
           "cleanPaths": [
             "apps/front/.next",
@@ -55,45 +155,54 @@
             "dist/admin-front"
           ],
           "cleanTsBuildInfo": true,
-          "cleanTsBuildInfoDirs": ["apps/front", "apps/admin-front"]
+          "cleanTsBuildInfoDirs": [
+            "apps/front",
+            "apps/admin-front"
+          ]
         }
       }
     }
   },
   "build": {
     "backend": {
-      "dev": {
+      "development": {
         "command": "npx nx build backend --configuration=development",
         "app": "backend",
         "description": "构建后端(开发环境)"
       },
-      "prod": {
+      "production": {
         "command": "npx nx build backend --configuration=production",
         "app": "backend",
         "description": "构建后端(生产环境)"
       }
     },
     "front": {
-      "dev": {
+      "development": {
         "command": "npx nx build front --configuration=development",
         "app": "front",
         "description": "构建前端(开发环境)"
       },
-      "prod": {
+      "production": {
         "command": "npx nx run front:exportDist",
         "app": "front",
         "description": "构建前端(生产环境)"
       }
     },
     "all": {
-      "dev": {
+      "development": {
         "concurrent": true,
-        "commands": ["build.backend.dev", "build.front.dev"],
+        "commands": [
+          "build.backend.development",
+          "build.front.development"
+        ],
         "description": "并发构建 backend/front(开发环境)"
       },
-      "prod": {
+      "production": {
         "concurrent": true,
-        "commands": ["build.backend.prod", "build.front.prod"],
+        "commands": [
+          "build.backend.production",
+          "build.front.production"
+        ],
         "description": "并发构建 backend/front(生产环境)"
       }
     }
@@ -105,12 +214,12 @@
       "description": "生成 Prisma Client"
     },
     "migrate": {
-      "dev": {
+      "development": {
         "command": "npx nx prisma:migrate:dev backend",
         "app": "backend",
         "description": "创建迁移(开发环境)"
       },
-      "prod": {
+      "production": {
         "command": "npx nx prisma:migrate:deploy backend",
         "app": "backend",
         "dangerous": true,
