@@ -125,6 +125,24 @@ describe('dx test unit path forwarding', () => {
     expect(result.output).toContain(pattern)
   })
 
+  test('unit target with path and --name appends both filters', () => {
+    const configDir = createTempConfigDir(createCommandsFixture())
+    const workspaceDir = createRunnableWorkspace()
+    const testPath = 'apps/backend/src/modules/chat/chat.service.spec.ts'
+    const pattern = '只跑这一个 case'
+
+    const result = runDx(
+      ['--config-dir', configDir, 'test', 'unit', 'backend', testPath, '--name', pattern],
+      { cwd: workspaceDir },
+    )
+
+    expect(result.code).toBe(0)
+    expect(result.output).toContain('--runTestsByPath')
+    expect(result.output).toContain(testPath)
+    expect(result.output).toContain('-t')
+    expect(result.output).toContain(pattern)
+  })
+
   test('nx unit command appends file path as positional argument', () => {
     const configDir = createTempConfigDir(createCommandsFixture())
     const workspaceDir = createRunnableWorkspace()
@@ -190,5 +208,28 @@ describe('dx test unit path forwarding', () => {
 
     expect(result.code).toBe(0)
     expect(result.output).toContain(`nx test front 'src/lib/url-param-persistence.test.ts'`)
+  })
+
+  test('nx jest target rewrites workspace path to project-root relative path', () => {
+    const configDir = createTempConfigDir(createCommandsFixture())
+    const workspaceDir = createRunnableWorkspace()
+    writeProjectConfig(workspaceDir, 'backend', {
+      targets: {
+        test: {
+          options: {
+            command: 'pnpm --filter @net/backend run test',
+          },
+        },
+      },
+    })
+    const testPath = 'apps/backend/src/modules/chat/chat.service.spec.ts'
+
+    const result = runDx(
+      ['--config-dir', configDir, 'test', 'unit', 'nxBackend', testPath],
+      { cwd: workspaceDir },
+    )
+
+    expect(result.code).toBe(0)
+    expect(result.output).toContain(`nx test backend 'src/modules/chat/chat.service.spec.ts'`)
   })
 })
