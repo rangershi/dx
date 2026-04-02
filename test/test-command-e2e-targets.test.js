@@ -1,6 +1,6 @@
 import { afterAll, describe, expect, test } from '@jest/globals'
 import { execFileSync } from 'node:child_process'
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 
@@ -50,6 +50,12 @@ function createRunnableWorkspace() {
   return tempDir
 }
 
+function writeProjectConfig(workspaceDir, target, config) {
+  const projectDir = join(workspaceDir, 'apps', target)
+  mkdirSync(projectDir, { recursive: true })
+  writeFileSync(join(projectDir, 'project.json'), JSON.stringify(config, null, 2))
+}
+
 function createCommandsFixture() {
   return {
     test: {
@@ -67,6 +73,13 @@ function createCommandsFixture() {
             'node -e "console.log(\'quantify path run\'); console.log(\'TEST_PATH=\' + process.argv[1]);" -- {TEST_PATH}',
           requiresPath: true,
           description: 'quantify e2e',
+        },
+        nxBackend: {
+          command: 'node -e "console.log(\'nx backend full run\')"',
+          fileCommand:
+            'node -e "console.log(process.argv.slice(1).join(\'\\n\'))" -- nx test:e2e backend -- {TEST_PATH}',
+          requiresPath: true,
+          description: 'nx backend e2e',
         },
         guardedNoFile: {
           command: 'node -e "console.log(\'guarded no file full run\')"',
@@ -139,6 +152,49 @@ describe('dx test e2e target-specific fileCommand', () => {
     expect(result.code).toBe(0)
     expect(result.output).toContain(`TEST_PATH=${testPath}`)
     expect(result.output).toContain(`TEST_NAME=${pattern}`)
+  })
+
+  test('--name pattern is appended and escaped correctly', () => {
+    const configDir = createTempConfigDir(createCommandsFixture())
+    const workspaceDir = createRunnableWorkspace()
+    const testPath = 'apps/backend/e2e/auth/auth login.e2e-spec.ts'
+    const pattern = `case "A" $USER \`tick\` 'single'`
+
+    const result = runDx(
+      ['--config-dir', configDir, 'test', 'e2e', 'backend', testPath, '--name', pattern],
+      { cwd: workspaceDir },
+    )
+
+    expect(result.code).toBe(0)
+    expect(result.output).toContain(`TEST_PATH=${testPath}`)
+    expect(result.output).toContain(`TEST_NAME=${pattern}`)
+  })
+
+  test('nx e2e fileCommand rewrites workspace path to project-root relative path', () => {
+    const configDir = createTempConfigDir(createCommandsFixture())
+    const workspaceDir = createRunnableWorkspace()
+    writeProjectConfig(workspaceDir, 'backend', {
+      targets: {
+        'test:e2e': {
+          options: {
+            command: 'pnpm --filter @net/backend run test:e2e:file',
+          },
+        },
+      },
+    })
+    const testPath = 'apps/backend/e2e/auth/auth.login.e2e-spec.ts'
+
+    const result = runDx(
+      ['--config-dir', configDir, 'test', 'e2e', 'nxBackend', testPath],
+      { cwd: workspaceDir },
+    )
+
+    expect(existsSync(join(workspaceDir, 'apps', 'backend', 'e2e'))).toBe(false)
+    expect(result.code).toBe(0)
+    expect(result.output).toContain('nx')
+    expect(result.output).toContain('test:e2e')
+    expect(result.output).toContain('backend')
+    expect(result.output).toContain('auth/auth.login.e2e-spec.ts')
   })
 
   test('guarded target without fileCommand fails with a configuration error', () => {
