@@ -1,44 +1,49 @@
 {
-  "dev": {
-    "backend": {
-      "command": "npx nx dev backend",
-      "app": "backend",
-      "ports": [3000],
-      "description": "启动后端开发服务"
-    },
-    "front": {
-      "command": "npx nx dev front",
-      "app": "front",
-      "ports": [3001],
-      "description": "启动前端开发服务"
-    },
-    "admin": {
-      "command": "npx nx dev admin-front",
-      "app": "admin-front",
-      "ports": [3500],
-      "description": "启动管理后台开发服务"
-    },
-    "telegram-bot": {
-      "command": "npx nx dev telegram-bot",
-      "app": "telegram-bot",
-      "ports": [3003],
-      "description": "启动 Telegram Bot 开发服务 (Vercel Dev)"
-    },
-    "all": {
-      "concurrent": true,
-      "commands": ["dev.backend", "dev.front", "dev.admin"],
-      "description": "同时启动所有开发服务",
-      "interactive": true
+  "help": {
+    "summary": "统一开发环境管理工具",
+    "globalOptions": [
+      {
+        "flags": ["--dev"],
+        "description": "使用开发环境"
+      },
+      {
+        "flags": ["--prod"],
+        "description": "使用生产环境"
+      }
+    ],
+    "examples": [
+      {
+        "command": "dx start backend --dev",
+        "description": "启动后端开发服务"
+      }
+    ],
+    "commands": {
+      "start": {
+        "summary": "启动/桥接服务",
+        "notes": [
+          "未指定 service 时默认使用开发套件，仅允许 --dev"
+        ],
+        "examples": [
+          {
+            "command": "dx start backend --dev",
+            "description": "启动后端开发服务"
+          },
+          {
+            "command": "dx start stack",
+            "description": "PM2 交互式服务栈"
+          }
+        ]
+      }
     }
   },
   "build": {
     "backend": {
-      "dev": {
+      "development": {
         "command": "npx nx build backend --configuration=development",
         "app": "backend",
         "description": "构建后端(开发环境)"
       },
-      "prod": {
+      "production": {
         "command": "npx nx build backend --configuration=production",
         "app": "backend",
         "description": "构建后端(生产环境)"
@@ -50,31 +55,31 @@
       "skipEnvValidation": true
     },
     "front": {
-      "dev": {
+      "development": {
         "command": "npx nx build front --configuration=development",
         "app": "front",
         "description": "构建前端(开发环境)"
       },
-      "prod": {
+      "production": {
         "command": "npx nx run front:exportDist",
         "app": "front",
         "description": "构建并导出前端到 dist/front (生产环境)"
       }
     },
     "admin": {
-      "dev": {
+      "development": {
         "command": "npx nx build admin-front --configuration=development",
         "app": "admin-front",
         "description": "构建管理后台(开发环境)"
       },
-      "prod": {
+      "production": {
         "command": "npx nx build admin-front --configuration=production",
         "app": "admin-front",
         "description": "构建管理后台(生产环境)"
       }
     },
     "mobile": {
-      "dev": {
+      "development": {
         "command": "cd apps/front && APP_ENV=local NEXT_PUBLIC_APP_ENV=local NEXT_CAPACITOR_BUILD=1 pnpm build:mobile && LANG=en_US.UTF-8 npx cap sync android && cd android && ./gradlew assembleDebug && cd .. && mkdir -p public/apk && cp android/app/build/outputs/apk/debug/app-debug.apk public/apk/app-dev.apk",
         "description": "构建连接本机后端的 Android 调试 APK，并复制到 apps/front/public/apk/app-dev.apk"
       },
@@ -82,43 +87,46 @@
         "command": "cd apps/front && VERSION=${ANDROID_VERSION_NAME:-$(node -p \"require('./package.json').version\")} && VERSION_CODE=${ANDROID_VERSION_CODE:-$(date +%s)} && APP_ENV=staging NEXT_PUBLIC_APP_ENV=staging NEXT_CAPACITOR_BUILD=1 pnpm build:mobile && LANG=en_US.UTF-8 npx cap sync android && cd android && ANDROID_VERSION_NAME=$VERSION ANDROID_VERSION_CODE=$VERSION_CODE ./gradlew assembleRelease && cd .. && mkdir -p dist/mobile/staging && cp android/app/build/outputs/apk/release/app-release.apk dist/mobile/staging/app-staging.apk && cp android/app/build/outputs/apk/release/app-release.apk dist/mobile/staging/app-staging-$VERSION.apk",
         "description": "构建连接 Staging 后端的 Android Release APK，并输出到 apps/front/dist/mobile/staging/ 目录（含版本副本，已签名）"
       },
-      "prod": {
+      "production": {
         "command": "cd apps/front && VERSION=${ANDROID_VERSION_NAME:-$(node -p \"require('./package.json').version\")} && VERSION_CODE=${ANDROID_VERSION_CODE:-$(date +%s)} && APP_ENV=production NEXT_PUBLIC_APP_ENV=production NEXT_CAPACITOR_BUILD=1 pnpm build:mobile && LANG=en_US.UTF-8 npx cap sync android && cd android && ANDROID_VERSION_NAME=$VERSION ANDROID_VERSION_CODE=$VERSION_CODE ./gradlew assembleRelease && cd .. && mkdir -p dist/mobile/prod && cp android/app/build/outputs/apk/release/app-release.apk dist/mobile/prod/app-prod.apk && cp android/app/build/outputs/apk/release/app-release.apk dist/mobile/prod/app-prod-$VERSION.apk",
         "description": "构建连接生产后端的 Android Release APK，并输出到 apps/front/dist/mobile/prod/ 目录（含版本副本，已签名）"
       }
     },
     "all": {
-      "dev": {
+      "development": {
         "sequential": true,
-        "commands": ["build.backend.dev", "build.sdk", "build.parallelWeb.dev"],
+        "commands": ["build.backend.development", "build.sdk", "build.parallelWeb.development"],
         "description": "构建所有应用(开发环境，Web并行)"
       },
-      "prod": {
+      "production": {
         "sequential": true,
         "commands": [
-          "build.backend.prod",
+          "build.backend.production",
           "build.sdk",
-          "build.parallelWeb.prod"
+          "build.parallelWeb.production"
         ],
         "description": "构建所有应用(生产环境，Web并行)"
       }
     },
     "parallelWeb": {
-      "dev": {
+      "help": {
+        "expose": false
+      },
+      "development": {
         "concurrent": true,
-        "commands": ["build.shared", "build.front.dev", "build.admin.dev"],
+        "commands": ["build.shared", "build.front.development", "build.admin.development"],
         "description": "并行构建 Web（shared/front/admin 开发环境）"
       },
-      "prod": {
+      "production": {
         "concurrent": true,
-        "commands": ["build.shared", "build.front.prod", "build.admin.prod"],
+        "commands": ["build.shared", "build.front.production", "build.admin.production"],
         "description": "并行构建 Web（shared/front/admin 生产环境）"
       }
     },
     "sdk": {
-      "dev": {
+      "development": {
         "internal": "sdk-build",
-        "args": ["dev"],
+        "args": ["development"],
         "description": "构建 SDK（开发环境，默认在线）",
         "env": {
           "APP_ENV": "development"
@@ -126,14 +134,14 @@
       },
       "staging": {
         "internal": "sdk-build",
-        "args": ["dev"],
+        "args": ["development"],
         "description": "构建 SDK（预发环境，默认在线）",
         "env": {
           "APP_ENV": "staging",
           "NODE_ENV": "production"
         }
       },
-      "prod": {
+      "production": {
         "internal": "sdk-build",
         "args": [],
         "description": "构建 SDK（生产环境，默认在线）",
@@ -144,11 +152,11 @@
       }
     },
     "affected": {
-      "dev": {
+      "development": {
         "command": "npx nx affected -t build --configuration=development --parallel=3",
         "description": "仅构建受影响项目(开发环境)"
       },
-      "prod": {
+      "production": {
         "command": "npx nx affected -t build --configuration=production --parallel=3",
         "description": "仅构建受影响项目(生产环境)"
       }
@@ -185,7 +193,7 @@
       "description": "生成Prisma客户端"
     },
     "migrate": {
-      "dev": {
+      "development": {
         "command": "npx nx prisma:migrate:dev backend",
         "app": "backend",
         "description": "执行数据库迁移(开发环境)"
@@ -195,7 +203,7 @@
         "app": "backend",
         "description": "执行数据库迁移(E2E测试环境)"
       },
-      "prod": {
+      "production": {
         "command": "npx nx prisma:migrate:deploy backend",
         "app": "backend",
         "dangerous": true,
@@ -203,7 +211,7 @@
       }
     },
     "deploy": {
-      "dev": {
+      "development": {
         "command": "npx nx prisma:migrate:deploy backend",
         "app": "backend",
         "description": "应用数据库迁移(开发环境)"
@@ -213,7 +221,7 @@
         "app": "backend",
         "description": "应用数据库迁移(E2E测试环境)"
       },
-      "prod": {
+      "production": {
         "command": "npx nx prisma:migrate:deploy backend",
         "app": "backend",
         "dangerous": true,
@@ -221,7 +229,7 @@
       }
     },
     "reset": {
-      "dev": {
+      "development": {
         "command": "npx nx prisma:migrate:reset backend && npx nx prisma:db:seed backend",
         "app": "backend",
         "dangerous": true,
@@ -233,7 +241,7 @@
         "dangerous": true,
         "description": "重置数据库并填充种子数据(E2E测试环境)"
       },
-      "prod": {
+      "production": {
         "command": "npx nx prisma:migrate:reset backend",
         "app": "backend",
         "dangerous": true,
@@ -241,7 +249,7 @@
       }
     },
     "seed": {
-      "dev": {
+      "development": {
         "command": "npx nx prisma:db:seed backend",
         "app": "backend",
         "description": "填充数据库(开发环境)"
@@ -251,7 +259,7 @@
         "app": "backend",
         "description": "填充数据库(E2E测试环境)"
       },
-      "prod": {
+      "production": {
         "command": "npx nx prisma:db:seed backend",
         "app": "backend",
         "description": "填充数据库(生产环境)"
@@ -262,12 +270,12 @@
       "description": "格式化Prisma schema文件"
     },
     "script": {
-      "dev": {
+      "development": {
         "command": "pnpm --filter ./apps/backend exec ts-node --swc -r tsconfig-paths/register prisma/scripts/{SCRIPT_NAME}.ts",
         "app": "backend",
         "description": "运行数据库脚本(开发环境)"
       },
-      "prod": {
+      "production": {
         "command": "pnpm --filter ./apps/backend exec ts-node --swc -r tsconfig-paths/register prisma/scripts/{SCRIPT_NAME}.ts",
         "app": "backend",
         "dangerous": true,
@@ -305,26 +313,26 @@
   },
   "start": {
     "backend": {
-      "dev": {
+      "development": {
         "command": "npx nx dev backend",
         "app": "backend",
         "description": "启动后端开发服务（支持热重载）"
       },
-      "prod": {
+      "production": {
         "command": "npx nx start backend",
         "app": "backend",
         "description": "启动后端生产服务"
       }
     },
     "telegram-bot": {
-      "dev": {
+      "development": {
         "command": "pnpm --filter @ai/telegram-bot dev",
         "app": "telegram-bot",
         "ports": [3003],
         "description": "启动 Telegram Bot 开发服务"
       }
     },
-    "dev": {
+    "development": {
       "internal": "start-dev",
       "args": [],
       "description": "启动完整开发环境（集成start-dev.sh功能）",

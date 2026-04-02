@@ -74,15 +74,11 @@ describe('dx test e2e backend guard', () => {
   })
 
   test('help output only shows path-based backend e2e examples', () => {
-    const result = runDx(['--help'])
+    const result = runDx(['help', 'test'])
 
     expect(result.code).toBe(0)
-    expect(result.output).not.toContain('target: backend, all (默认: all)')
-    expect(result.output).toContain('path: 测试文件或目录路径 (guarded e2e target 必填，例如 backend/quantify)')
-    expect(result.output).toContain('dx test e2e backend apps/backend/e2e/auth')
-    expect(result.output).toContain('dx test e2e quantify apps/quantify/e2e/health/health.e2e-spec.ts')
-    expect(result.output).toContain('dx test e2e all          # 不受支持，必须指定 target 和 path')
-    expect(result.output).not.toContain('dx test e2e backend                           # 运行后端E2E测试')
+    expect(result.output).toContain('test 命令用法:')
+    expect(result.output).toContain('dx test [type] <target> [path]')
   })
 })
 

@@ -21,7 +21,7 @@ jest.unstable_mockModule('../lib/env.js', () => ({
   },
 }))
 
-const { parseFlags } = await import('../lib/cli/flags.js')
+const { FLAG_DEFINITIONS, parseFlags } = await import('../lib/cli/flags.js')
 const { showCommandHelp, showHelp } = await import('../lib/cli/help.js')
 const { handleDeploy } = await import('../lib/cli/commands/deploy.js')
 const { runBackendArtifactDeploy } = await import('../lib/backend-artifact-deploy.js')
@@ -104,15 +104,78 @@ describe('backend artifact deploy routing', () => {
 
   test('deploy help documents backend artifact mode and different defaults', () => {
     const logSpy = jest.spyOn(console, 'log').mockImplementation(() => {})
+    const cli = {
+      invocation: 'dx',
+      commands: {
+        help: {
+          summary: '统一开发环境管理工具',
+          commands: {
+            deploy: {
+              summary: '部署前端到 Vercel 或后端制品到远端主机',
+              usage: 'dx deploy <target> [环境标志] [选项]',
+              notes: ['backend 制品发布目标默认 --dev'],
+              examples: [
+                {
+                  command: 'dx deploy backend --prod',
+                  description: '构建 backend 制品并部署到远端主机',
+                },
+              ],
+            },
+          },
+          targets: {
+            deploy: {
+              backend: {
+                summary: '构建并部署 backend 制品到远端主机',
+                options: [
+                  {
+                    flags: ['--build-only'],
+                    description: '仅本地构建并打包制品，不上传不远端部署',
+                  },
+                  {
+                    flags: ['--skip-migration'],
+                    description: '远端部署时跳过 prisma migrate deploy',
+                  },
+                ],
+                examples: [
+                  {
+                    command: 'dx deploy backend --build-only',
+                    description: '仅构建 backend 制品',
+                  },
+                ],
+              },
+            },
+          },
+          examples: [
+            {
+              command: 'dx deploy backend --build-only',
+              description: '仅构建 backend 制品',
+            },
+          ],
+        },
+        deploy: {
+          backend: {
+            internal: 'backend-artifact-deploy',
+          },
+          front: {
+            description: '部署 front 到 Vercel',
+          },
+        },
+      },
+      commandHandlers: {
+        deploy: () => {},
+      },
+      flagDefinitions: FLAG_DEFINITIONS,
+    }
 
-    showHelp()
-    showCommandHelp('deploy')
+    showHelp(cli)
+    showCommandHelp('deploy', cli)
 
     const output = logSpy.mock.calls.flat().join('\n')
+    expect(output).toContain('部署前端到 Vercel 或后端制品到远端主机')
     expect(output).toContain('dx deploy backend --prod')
     expect(output).toContain('--build-only')
     expect(output).toContain('--skip-migration')
-    expect(output).toContain('默认 --staging')
+    expect(output).toContain('构建并部署 backend 制品到远端主机')
     expect(output).toContain('backend 制品发布目标默认 --dev')
 
     logSpy.mockRestore()

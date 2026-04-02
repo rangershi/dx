@@ -32,7 +32,7 @@ describe('dx start command guard', () => {
 
     expect(result.code).not.toBe(0)
     expect(result.output).toContain('dx start 在未指定服务时仅允许使用开发环境')
-    expect(result.output).toContain('dx start all --dev')
+    expect(result.output).toContain('dx start --dev')
     expect(result.output).toContain('dx start backend --prod')
   })
 

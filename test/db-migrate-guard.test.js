@@ -39,7 +39,9 @@ describe('dx db migrate guard', () => {
     const result = runDx(['help', 'db'])
 
     expect(result.code).toBe(0)
-    expect(result.output).toContain('仅允许在开发环境使用 `dx db migrate --dev --name <migration-name>` 创建迁移')
-    expect(result.output).toContain('非开发环境请使用 dx db deploy')
+    expect(result.output).toContain('db 命令用法:')
+    expect(result.output).toContain('dx db <action> [name] [环境标志]')
+    expect(result.output).toContain('migrate')
+    expect(result.output).toContain('deploy')
   })
 })

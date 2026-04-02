@@ -1,4 +1,41 @@
 {
+  "help": {
+    "summary": "统一开发环境管理工具",
+    "globalOptions": [
+      {
+        "flags": ["--dev"],
+        "description": "使用开发环境"
+      },
+      {
+        "flags": ["--prod"],
+        "description": "使用生产环境"
+      }
+    ],
+    "examples": [
+      {
+        "command": "dx start backend --dev",
+        "description": "启动后端开发服务"
+      }
+    ],
+    "commands": {
+      "start": {
+        "summary": "启动/桥接服务",
+        "notes": [
+          "未指定 service 时默认使用开发套件，仅允许 --dev"
+        ],
+        "examples": [
+          {
+            "command": "dx start backend --dev",
+            "description": "启动后端开发服务"
+          },
+          {
+            "command": "dx start stack",
+            "description": "PM2 交互式服务栈"
+          }
+        ]
+      }
+    }
+  },
   "start": {
     "backend": {
       "command": "npx nx dev backend",
@@ -17,6 +54,11 @@
       "commands": ["start.backend", "start.front"],
       "description": "并发启动 backend/front"
     },
+    "development": {
+      "concurrent": true,
+      "commands": ["start.backend", "start.front"],
+      "description": "默认开发套件"
+    },
     "stack": {
       "internal": "pm2-stack",
       "interactive": true,
@@ -33,38 +75,38 @@
   },
   "build": {
     "backend": {
-      "dev": {
+      "development": {
         "command": "npx nx build backend --configuration=development",
         "app": "backend",
         "description": "构建后端(开发环境)"
       },
-      "prod": {
+      "production": {
         "command": "npx nx build backend --configuration=production",
         "app": "backend",
         "description": "构建后端(生产环境)"
       }
     },
     "front": {
-      "dev": {
+      "development": {
         "command": "npx nx build front --configuration=development",
         "app": "front",
         "description": "构建前端(开发环境)"
       },
-      "prod": {
+      "production": {
         "command": "npx nx build front --configuration=production",
         "app": "front",
         "description": "构建前端(生产环境)"
       }
     },
     "all": {
-      "dev": {
+      "development": {
         "concurrent": true,
-        "commands": ["build.backend.dev", "build.front.dev"],
+        "commands": ["build.backend.development", "build.front.development"],
         "description": "并发构建 backend/front(开发环境)"
       },
-      "prod": {
+      "production": {
         "concurrent": true,
-        "commands": ["build.backend.prod", "build.front.prod"],
+        "commands": ["build.backend.production", "build.front.production"],
         "description": "并发构建 backend/front(生产环境)"
       }
     }
@@ -76,12 +118,12 @@
       "description": "生成 Prisma Client"
     },
     "migrate": {
-      "dev": {
+      "development": {
         "command": "npx nx prisma:migrate:dev backend",
         "app": "backend",
         "description": "创建迁移(开发环境)"
       },
-      "prod": {
+      "production": {
         "command": "npx nx prisma:migrate:deploy backend",
         "app": "backend",
         "dangerous": true,
@@ -89,12 +131,12 @@
       }
     },
     "deploy": {
-      "dev": {
+      "development": {
         "command": "npx nx prisma:migrate:deploy backend",
         "app": "backend",
         "description": "应用迁移(开发环境)"
       },
-      "prod": {
+      "production": {
         "command": "npx nx prisma:migrate:deploy backend",
         "app": "backend",
         "dangerous": true,
