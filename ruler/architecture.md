@@ -72,7 +72,7 @@ ruler/                      # 常驻提示词（本文件所在目录）
   - .env 文件布局限制（禁止根 `.env` / `.env.local`，禁止子目录散落 `.env*`，可配置例外）
   - 机密 key 的占位符策略（committed 文件必须为占位符，真实值只能在 `.local`）
   - required keys（按 target + environment）
-- `env-policy.jsonc` 为必需配置；缺失时 dx 将直接报错（迁移参考 `upgrade.md`）。
+- `env-policy.jsonc` 为必需配置；缺失时 dx 将直接报错。
 
 ## 约定速记（对“被 dx 管理的目标工程”）
 

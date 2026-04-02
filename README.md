@@ -4,6 +4,38 @@
 
 本工具通过项目内的 `dx/config/*` 配置文件来驱动命令执行：你可以把它理解成「带环境变量分层 + 校验 + 命令编排能力的脚本系统」。
 
+## 当前规范
+
+当前版本的 `dx` 已收敛到 strict 配置规范。
+
+这意味着：
+
+- 配置写错时直接报错，不再自动兼容旧写法
+- `help` 输出由 `dx/config/commands.json` 动态生成，不再依赖代码中的大段硬编码文案
+- 命令配置中的环境分支必须使用完整环境键
+
+当前推荐且受支持的环境键：
+
+- `development`
+- `staging`
+- `production`
+- `test`
+- `e2e`
+
+当前推荐且受支持的 CLI 环境标志：
+
+- `--dev`
+- `--staging`
+- `--prod`
+- `--test`
+- `--e2e`
+
+不再建议写法：
+
+- `dev` / `prod` 作为配置节点名
+- `--development` / `--production` / `--stage`
+- 任何旧配置回退、旧命令别名或自动输入修正
+
 ## 安装
 
 必须全局安装，并始终使用最新版本：
@@ -70,12 +102,14 @@ DX_CONFIG_DIR=/path/to/your-repo/dx/config dx status
 
 ### 1) dx/config/commands.json
 
-这是核心文件，定义了 dx 各命令要执行的 shell 命令，支持：
+这是核心文件，定义了 dx 各命令要执行的 shell 命令，也承载帮助信息配置。
+
+它支持：
 
 - 单命令：`{ "command": "..." }`
-- 并发：`{ "concurrent": true, "commands": ["build.front.dev", "build.admin.dev"] }`
-- 串行：`{ "sequential": true, "commands": ["build.backend.prod", "build.sdk"] }`
-- 环境分支：如 `build.backend.dev` / `build.backend.prod`（dx 会根据 `--dev/--prod/--staging/...` 选择）
+- 并发：`{ "concurrent": true, "commands": ["build.front.development", "build.admin.development"] }`
+- 串行：`{ "sequential": true, "commands": ["build.backend.production", "build.sdk"] }`
+- 环境分支：如 `build.backend.development` / `build.backend.production`（dx 会根据 `--dev/--prod/--staging/...` 选择）
 - dotenv 包裹：配置里带 `"app": "backend"` 时，dx 会按 `env-layers.json` 拼出 dotenv 层并用 `pnpm exec dotenv ... -- <command>` 执行
 
 常见字段（单命令配置）：
@@ -95,8 +129,38 @@ DX_CONFIG_DIR=/path/to/your-repo/dx/config dx status
 命令路径引用（并发/串行的 commands 数组）使用点号字符串，例如：
 
 ```json
-{ "concurrent": true, "commands": ["build.shared", "build.front.dev"] }
+{ "concurrent": true, "commands": ["build.shared", "build.front.development"] }
 ```
+
+帮助配置示例：
+
+```json
+{
+  "help": {
+    "summary": "统一开发环境管理工具",
+    "globalOptions": [
+      { "flags": ["--dev"], "description": "使用 development 环境" },
+      { "flags": ["--prod"], "description": "使用 production 环境" }
+    ],
+    "commands": {
+      "start": {
+        "summary": "启动/桥接服务",
+        "notes": ["未指定 service 时默认使用开发套件，仅允许 --dev"],
+        "examples": [
+          { "command": "dx start backend --dev", "description": "启动后端开发服务" }
+        ]
+      }
+    }
+  }
+}
+```
+
+约束：
+
+- 命令级帮助推荐放在 `help.commands.<command>`
+- target 级帮助推荐放在 `help.targets.<command>.<target>`
+- 帮助示例必须与真实命令树一致，不能写配置里不存在的 target
+- 运行时会校验 help 配置结构；坏配置会直接报错
 
 ### 2) dx/config/env-layers.json
 
@@ -201,6 +265,15 @@ dx lint
 dx test e2e backend apps/backend/e2e/auth
 dx test e2e quantify apps/quantify/e2e/health/health.e2e-spec.ts
 ```
+
+关于 `help`：
+
+- `dx --help`
+- `dx help <command>`
+
+现在都优先从 `commands.json` 的 `help` 区域动态生成。
+
+如果某个命令还没有补充足够的 `help` 元数据，输出会回退到配置结构推导出的最小帮助，而不是旧的手写兼容文案。
 
 命令约束摘要：
 

@@ -67,7 +67,3 @@ dx/
 ```
 
 说明与字段约定详见：`README.md` 与 `example/README.md`。
-
-### env-policy 迁移（legacy -> 新策略）
-
-如果目标工程仍在使用 legacy 的 3 个配置文件，迁移指南见：`upgrade.md`。
