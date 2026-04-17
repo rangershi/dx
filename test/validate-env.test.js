@@ -185,6 +185,37 @@ describe('validateEnvironment() - Subdir Layout Scanning', () => {
     expect(() => validateEnvironment()).not.toThrow()
   })
 
+  it('should allow apps/<any>/.env.* via mid-segment glob apps/*/.env*', async () => {
+    process.env.DX_PROJECT_ROOT = tempDir
+    process.env.DX_CONFIG_DIR = join(tempDir, 'dx/config')
+
+    createMinimalPolicy(tempDir, { allowSubdirGlobs: ['apps/*/.env*'] })
+
+    const appDir = join(tempDir, 'apps/mobile-front')
+    mkdirSync(appDir, { recursive: true })
+    writeEnvFile(appDir, '.env.development', { FOO: 'bar' })
+    writeEnvFile(appDir, '.env.development.example', { FOO: 'bar' })
+
+    const { validateEnvironment } = await import('../lib/validate-env.js')
+
+    expect(() => validateEnvironment()).not.toThrow()
+  })
+
+  it('should reject deeper paths when glob uses single * (apps/*/.env*)', async () => {
+    process.env.DX_PROJECT_ROOT = tempDir
+    process.env.DX_CONFIG_DIR = join(tempDir, 'dx/config')
+
+    createMinimalPolicy(tempDir, { allowSubdirGlobs: ['apps/*/.env*'] })
+
+    const nested = join(tempDir, 'apps/mobile-front/src')
+    mkdirSync(nested, { recursive: true })
+    writeEnvFile(nested, '.env.development', { FOO: 'bar' })
+
+    const { validateEnvironment } = await import('../lib/validate-env.js')
+
+    expect(() => validateEnvironment()).toThrow()
+  })
+
   it('should allow docker/.env.foo via policy glob docker/.env*', async () => {
     process.env.DX_PROJECT_ROOT = tempDir
     process.env.DX_CONFIG_DIR = join(tempDir, 'dx/config')
