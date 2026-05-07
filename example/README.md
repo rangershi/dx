@@ -209,6 +209,35 @@ dx start stack
 - 旧规范标志
 - 已删除的兼容入口
 
+### 6. 后端制品部署使用内置 runner
+
+这份 example 里的 `deploy.backend` 演示了内置后端制品部署：
+
+配置要点是 `internal: "backend-artifact-deploy"`。
+
+```json
+{
+  "deploy": {
+    "backend": {
+      "internal": "backend-artifact-deploy"
+    }
+  }
+}
+```
+
+常用命令：
+
+```bash
+dx deploy backend --prod
+dx deploy backend --build-only
+dx deploy backend --prod --skip-migration
+```
+
+配置 `backendDeploy` 时要注意：
+
+- 所有本地路径字段都会先约束在项目根目录内，不能通过 `../` 指到项目外。
+- `remote.baseDir` 必须使用绝对路径，并且只能包含 `/`、字母、数字、`.`、`_`、`-`。
+
 ## `env-layers.json` 怎么理解
 
 [env-layers.json](/Users/a1/work/dx/example/dx/config/env-layers.json) 只负责一件事：

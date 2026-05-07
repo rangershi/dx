@@ -28,7 +28,7 @@ describe('runCodexInitial', () => {
     jest.restoreAllMocks()
   })
 
-  test('copies root skills into ~/.codex/skills and ~/.claude/skills with merge-overwrite semantics', async () => {
+  test('syncs packaged skill directories into ~/.codex/skills and ~/.claude/skills', async () => {
     mkdirSync(join(packageRoot, 'skills', 'skill-a', 'references'), { recursive: true })
     mkdirSync(join(packageRoot, 'skills', 'skill-b', 'agents'), { recursive: true })
     writeFileSync(join(packageRoot, 'skills', 'skill-a', 'SKILL.md'), '# new skill a')
@@ -54,14 +54,14 @@ describe('runCodexInitial', () => {
     expect(readFileSync(join(homeDir, '.codex', 'skills', 'skill-a', 'config.yaml'), 'utf8')).toBe('k: new')
     expect(readFileSync(join(homeDir, '.codex', 'skills', 'skill-a', 'references', 'readme.md'), 'utf8')).toBe('new ref')
     expect(readFileSync(join(homeDir, '.codex', 'skills', 'skill-b', 'agents', 'openai.yaml'), 'utf8')).toBe('model: gpt')
-    expect(readFileSync(join(homeDir, '.codex', 'skills', 'skill-a', 'references', 'keep.md'), 'utf8')).toBe('keep me')
+    expect(existsSync(join(homeDir, '.codex', 'skills', 'skill-a', 'references', 'keep.md'))).toBe(false)
     expect(readFileSync(join(homeDir, '.codex', 'skills', 'skill-existing-only', 'SKILL.md'), 'utf8')).toBe('# existing only')
 
     expect(readFileSync(join(homeDir, '.claude', 'skills', 'skill-a', 'SKILL.md'), 'utf8')).toBe('# new skill a')
     expect(readFileSync(join(homeDir, '.claude', 'skills', 'skill-a', 'config.yaml'), 'utf8')).toBe('k: new')
     expect(readFileSync(join(homeDir, '.claude', 'skills', 'skill-a', 'references', 'readme.md'), 'utf8')).toBe('new ref')
     expect(readFileSync(join(homeDir, '.claude', 'skills', 'skill-b', 'agents', 'openai.yaml'), 'utf8')).toBe('model: gpt')
-    expect(readFileSync(join(homeDir, '.claude', 'skills', 'skill-a', 'references', 'keep.md'), 'utf8')).toBe('keep claude')
+    expect(existsSync(join(homeDir, '.claude', 'skills', 'skill-a', 'references', 'keep.md'))).toBe(false)
     expect(readFileSync(join(homeDir, '.claude', 'skills', 'skill-existing-only', 'SKILL.md'), 'utf8')).toBe('# existing claude only')
   })
 
