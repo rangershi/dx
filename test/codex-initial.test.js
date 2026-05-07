@@ -1,5 +1,5 @@
 import { describe, test, expect, beforeEach, afterEach, jest } from '@jest/globals'
-import { mkdtempSync, writeFileSync, rmSync, mkdirSync, readFileSync, existsSync } from 'node:fs'
+import { mkdtempSync, writeFileSync, rmSync, mkdirSync, readFileSync, existsSync, renameSync, promises as fsPromises } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 
@@ -114,6 +114,47 @@ describe('runCodexInitial', () => {
     expect(existsSync(join(homeDir, '.claude', 'skills', 'git-commit-and-pr'))).toBe(false)
     expect(existsSync(join(homeDir, '.claude', 'skills', 'autospec'))).toBe(false)
     expect(readFileSync(join(homeDir, '.claude', 'skills', 'keep-skill', 'SKILL.md'), 'utf8')).toBe('# keep')
+  })
+
+  test('removes stale temporary skill directories before syncing', async () => {
+    mkdirSync(join(packageRoot, 'skills', 'skill-a'), { recursive: true })
+    writeFileSync(join(packageRoot, 'skills', 'skill-a', 'SKILL.md'), '# skill a')
+
+    mkdirSync(join(homeDir, '.codex', 'skills', '.skill-a.tmp-123-456'), { recursive: true })
+    mkdirSync(join(homeDir, '.codex', 'skills', '.skill-a.backup-123-456'), { recursive: true })
+    mkdirSync(join(homeDir, '.claude', 'skills', '.skill-a.tmp-123-456'), { recursive: true })
+    mkdirSync(join(homeDir, '.claude', 'skills', '.skill-a.backup-123-456'), { recursive: true })
+
+    await runCodexInitial({ packageRoot, homeDir })
+
+    expect(existsSync(join(homeDir, '.codex', 'skills', '.skill-a.tmp-123-456'))).toBe(false)
+    expect(existsSync(join(homeDir, '.codex', 'skills', '.skill-a.backup-123-456'))).toBe(false)
+    expect(existsSync(join(homeDir, '.claude', 'skills', '.skill-a.tmp-123-456'))).toBe(false)
+    expect(existsSync(join(homeDir, '.claude', 'skills', '.skill-a.backup-123-456'))).toBe(false)
+  })
+
+  test('restores existing skill directory when replacement fails after backup', async () => {
+    mkdirSync(join(packageRoot, 'skills', 'skill-a'), { recursive: true })
+    writeFileSync(join(packageRoot, 'skills', 'skill-a', 'SKILL.md'), '# new skill a')
+
+    mkdirSync(join(homeDir, '.codex', 'skills', 'skill-a'), { recursive: true })
+    writeFileSync(join(homeDir, '.codex', 'skills', 'skill-a', 'SKILL.md'), '# old skill a')
+
+    const originalRename = renameSync
+    const renameSpy = jest.spyOn(fsPromises, 'rename').mockImplementation(async (from, to) => {
+      if (String(to).endsWith('/skill-a') && String(from).includes('.skill-a.tmp-')) {
+        throw new Error('rename failed')
+      }
+      originalRename(from, to)
+    })
+
+    try {
+      await expect(runCodexInitial({ packageRoot, homeDir })).rejects.toThrow('rename failed')
+    } finally {
+      renameSpy.mockRestore()
+    }
+
+    expect(readFileSync(join(homeDir, '.codex', 'skills', 'skill-a', 'SKILL.md'), 'utf8')).toBe('# old skill a')
   })
 
   test('throws when root skills directory is missing', async () => {
