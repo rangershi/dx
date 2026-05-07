@@ -1,0 +1,7 @@
+interface:
+  display_name: "Multi-PR Feature Delivery"
+  short_description: "按复杂度评估单 PR 或多 PR 交付流程"
+  default_prompt: "使用 $multi-pr-feature-delivery 对当前需求进行复杂度评估，并按 Track A/B/C 执行交付流程。"
+
+policy:
+  allow_implicit_invocation: false
