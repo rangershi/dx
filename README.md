@@ -192,53 +192,6 @@ target（端）不写死，由 `env-policy.jsonc.targets` 定义；`commands.jso
 
 查看 `example/`：包含一个最小可读的 `dx/config` 配置示例，以及如何在一个 pnpm+nx monorepo 中接入 dx。
 
-## PR Review Loop（自动评审-修复闭环）
-
-仓库内提供了基于 Codex Skill 的 PR 评审自动化工作流：并行评审 -> 聚合结论 -> 生成修复清单 -> 自动修复 -> 再评审，最多循环 3 轮，用于让 PR 更快收敛。
-
-### 什么时候用
-
-- PR 变更较大、想要更系统地覆盖安全/性能/可维护性问题
-- 希望在 CI 通过前提下，把评审建议落成可执行修复清单（fixFile）
-- 希望避免同一个问题在不同轮次被反复提出（Decision Log）
-
-### 如何运行
-
-在 Codex 会话中触发该技能：
-
-```text
-使用 $pr-review-loop 对 PR #<PR_NUMBER> 执行审核闭环
-```
-
-技能入口与说明见：
-
-- `skills/pr-review-loop/SKILL.md`
-- `skills/pr-review-loop/references/agents/*.md`
-
-### 工作流概览
-
-- 预检（`pr-precheck`）：先做编译/基础 gate，不通过则终止流程
-- 获取上下文（`pr-context`）：生成本轮上下文缓存 `contextFile` 与 `runId`
-- 并行评审（reviewers）：按 `./reviewer/*-reviewer.md` 并行审查并产出 reviewFile
-- 聚合（`pr-review-aggregate` 模式 A）：合并评审结果、去重、发布 Review Summary、生成 `fixFile`
-- 修复（`fixer`）：按 `fixFile` 执行修复并产出 `fixReportFile`
-- 发布修复报告（`pr-review-aggregate` 模式 B）
-
-### 缓存文件（项目内 `./.cache/`）
-
-该流程中间产物写入 `./.cache/`，并在各阶段传递相对路径：
-
-- `./.cache/pr-context-pr<PR>-r<ROUND>-<RUN_ID>.md`（contextFile）
-- `./.cache/review-<ROLE_CODE>-pr<PR>-r<ROUND>-<RUN_ID>.md`（reviewFile）
-- `./.cache/fix-pr<PR>-r<ROUND>-<RUN_ID>.md`（fixFile）
-- `./.cache/fix-report-pr<PR>-r<ROUND>-<RUN_ID>.md`（fixReportFile）
-
-### Decision Log（跨轮次决策日志）
-
-- 文件：`./.cache/decision-log-pr<PR_NUMBER>.md`
-- 作用：记录每轮 Fixed/Rejected 结论，后续轮次用于过滤重复问题
-- 规则：默认 append-only，保留历史决策用于收敛
-
 ## 命令
 
 dx 的命令由 `dx/config/commands.json` 驱动，并且内置了一些 internal runner（避免项目侧依赖任何 `scripts/lib/*.js`）：
@@ -265,6 +218,12 @@ dx lint
 dx test e2e backend apps/backend/e2e/auth
 dx test e2e quantify apps/quantify/e2e/health/health.e2e-spec.ts
 ```
+
+关于 `dx initial`：
+
+- `dx initial` 会把 npm 包内置的 `skills/` 同步到 `~/.codex/skills` 与 `~/.claude/skills`。
+- 包内管理的同名 skill 目录会按当前包内容替换；旧版本中已删除的官方 skill 会被清理。
+- 不属于包内管理的其他用户自有 skill 目录会保留。
 
 关于 `help`：
 

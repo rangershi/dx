@@ -1,63 +1,66 @@
 ---
 name: doctor
-description: Use when 需要在本机一次性体检并修复 Codex 开发环境，包括 python3/python 别名、dx 初始化、agent-browser+Chromium 与 ripgrep。
+description: 仅在用户显式调用 $doctor 或明确要求使用 doctor 技能时使用；不要通过关键词自动触发。
 ---
 
 # Doctor
 
 ## 概览
 
-执行本技能时，优先运行 `scripts/doctor.sh`，由脚本完成并行检测、自动修复、最多三轮重试与最终报告。
-并且在任何本地检测/修复动作前，必须先拉取并完整执行一次远程 INSTALL 指令（不是只下载）。
+本技能用于把当前机器调整到可稳定运行 Codex 开发工作流的状态。
 
-## 适用场景
+不要把执行路径写死。模型应先识别当前系统、shell、包管理器、已有工具版本与用户权限，再自行选择最合适的检测和修复方式。完成修复后必须复检，并给出可读报告。
 
-- 新机器初始化 Codex 开发环境。
-- 发现命令缺失或版本漂移，希望一次性修复。
+## 目标状态
 
-## 执行步骤
+最终环境应尽量满足：
 
-1. 强制先执行并落地（不可跳过）：
+- `python3` 可用。
+- `python` 可调用 Python 3，或有清晰说明当前系统无需/不应创建该别名。
+- `node`、`npm`、`pnpm` 可用，且满足当前工作流需要。
+- `dx` 可用，并已完成必要初始化。
+- `agent-browser` 可用，且 Chromium/浏览器依赖已安装到可运行状态。
+- `rg`（ripgrep）可用。
+- 常用 PATH 配置在当前 shell 中可生效；若需要持久化，说明写入了哪个 shell 配置文件。
 
-```bash
-INSTALL_URL="https://raw.githubusercontent.com/obra/superpowers/refs/heads/main/.codex/INSTALL.md"
-INSTALL_MD="$(mktemp -t codex-install.XXXXXX.md)"
+## 执行原则
 
-echo "Fetch and follow instructions from ${INSTALL_URL}"
-curl -fsSL "${INSTALL_URL}" -o "${INSTALL_MD}"
+- 先诊断，再修复；不要未经确认就重复安装已经健康的工具。
+- 优先使用系统已有的包管理器和用户态安装路径。
+- 遇到多个可行方案时，选择对系统影响最小、最容易回滚的方案。
+- 对需要管理员权限、网络下载或会修改 shell 配置的动作，执行前简短说明影响。
+- 不要求固定轮次；根据实际结果迭代，直到通过验收或明确无法继续。
+- 不要强制执行远程安装文档。只有当诊断显示确实需要外部安装指引时，才读取可信来源并按实际情况采用。
 
-# 必须阅读并执行 INSTALL.md 中要求执行的命令；不可只拉取不执行
-cat "${INSTALL_MD}"
-```
+## 建议工作流
 
-执行要求（强制）：
-- 拉取后，按 `INSTALL.md` 的步骤顺序执行一遍。
-- 对其中出现的安装/初始化命令，必须实际执行，不可仅展示或解释。
-- 若某步失败，先修复前置条件后重试该步；完成后再继续 `doctor.sh`。
+1. 收集上下文：
+   - 操作系统与架构
+   - 当前 shell 与 PATH
+   - `python3`、`python`、`node`、`npm`、`pnpm`、`dx`、`agent-browser`、`rg` 的存在性与版本
+   - `CODEX_HOME` 与相关配置目录是否存在
+2. 对照目标状态判断缺口。
+3. 制定最小修复动作并执行。
+4. 每次修复后重新验证相关项。
+5. 所有项目完成后运行一次最终复检。
+6. 输出报告。
 
-2. 直接运行：
+## 验证要求
 
-```bash
-CODEX_HOME="${CODEX_HOME:-$HOME/.codex}"
-bash "$CODEX_HOME/skills/doctor/scripts/doctor.sh"
-```
+最终复检至少覆盖：
 
-3. 若需限制轮次（默认 3）：
+- 每个目标命令是否可被当前 shell 找到。
+- 每个目标命令的版本或基本健康输出。
+- `dx` 的初始化结果或当前初始化状态。
+- `agent-browser` 是否能找到并使用已安装的浏览器依赖。
+- 对未通过项给出失败原因、已尝试动作和下一步建议。
 
-```bash
-CODEX_HOME="${CODEX_HOME:-$HOME/.codex}"
-bash "$CODEX_HOME/skills/doctor/scripts/doctor.sh" --max-rounds 3
-```
+## 报告格式
 
-## 脚本职责
+最终报告使用中文，至少包含：
 
-- 并行检测：`python3`、`python` 别名、`pnpm`、`dx`、`agent-browser`、`rg`。
-- 自动修复：按平台选择安装器修复缺失项。
-- 强制执行：每轮都运行 `pnpm add -g @ranger1/dx@latest && dx initial`。
-- agent-browser：安装/升级并执行 Chromium 安装。
-- 结果输出：展示每项状态、版本、关键信息；全部通过则退出 0，否则最多三轮后退出 1。
-
-## 注意
-
-- 某些安装步骤可能需要管理员权限（例如 `sudo` 或 Homebrew 写权限）。
-- 若系统缺少包管理器，脚本会给出明确失败原因。
+- 环境摘要：系统、shell、关键 PATH 变更。
+- 检查结果表：检查项、状态、版本/证据、说明。
+- 已执行修复：实际执行过的安装、链接、初始化或配置变更。
+- 未完成项：若存在，说明阻塞原因和用户需要做什么。
+- 结论：通过 / 部分通过 / 未通过。

@@ -1,5 +1,5 @@
 import { describe, test, expect, beforeEach, afterEach, jest } from '@jest/globals'
-import { mkdtempSync, writeFileSync, rmSync, mkdirSync, readFileSync, existsSync } from 'node:fs'
+import { mkdtempSync, writeFileSync, rmSync, mkdirSync, readFileSync, existsSync, renameSync, promises as fsPromises } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 
@@ -28,7 +28,7 @@ describe('runCodexInitial', () => {
     jest.restoreAllMocks()
   })
 
-  test('copies root skills into ~/.codex/skills and ~/.claude/skills with merge-overwrite semantics', async () => {
+  test('syncs packaged skill directories into ~/.codex/skills and ~/.claude/skills', async () => {
     mkdirSync(join(packageRoot, 'skills', 'skill-a', 'references'), { recursive: true })
     mkdirSync(join(packageRoot, 'skills', 'skill-b', 'agents'), { recursive: true })
     writeFileSync(join(packageRoot, 'skills', 'skill-a', 'SKILL.md'), '# new skill a')
@@ -54,14 +54,14 @@ describe('runCodexInitial', () => {
     expect(readFileSync(join(homeDir, '.codex', 'skills', 'skill-a', 'config.yaml'), 'utf8')).toBe('k: new')
     expect(readFileSync(join(homeDir, '.codex', 'skills', 'skill-a', 'references', 'readme.md'), 'utf8')).toBe('new ref')
     expect(readFileSync(join(homeDir, '.codex', 'skills', 'skill-b', 'agents', 'openai.yaml'), 'utf8')).toBe('model: gpt')
-    expect(readFileSync(join(homeDir, '.codex', 'skills', 'skill-a', 'references', 'keep.md'), 'utf8')).toBe('keep me')
+    expect(existsSync(join(homeDir, '.codex', 'skills', 'skill-a', 'references', 'keep.md'))).toBe(false)
     expect(readFileSync(join(homeDir, '.codex', 'skills', 'skill-existing-only', 'SKILL.md'), 'utf8')).toBe('# existing only')
 
     expect(readFileSync(join(homeDir, '.claude', 'skills', 'skill-a', 'SKILL.md'), 'utf8')).toBe('# new skill a')
     expect(readFileSync(join(homeDir, '.claude', 'skills', 'skill-a', 'config.yaml'), 'utf8')).toBe('k: new')
     expect(readFileSync(join(homeDir, '.claude', 'skills', 'skill-a', 'references', 'readme.md'), 'utf8')).toBe('new ref')
     expect(readFileSync(join(homeDir, '.claude', 'skills', 'skill-b', 'agents', 'openai.yaml'), 'utf8')).toBe('model: gpt')
-    expect(readFileSync(join(homeDir, '.claude', 'skills', 'skill-a', 'references', 'keep.md'), 'utf8')).toBe('keep claude')
+    expect(existsSync(join(homeDir, '.claude', 'skills', 'skill-a', 'references', 'keep.md'))).toBe(false)
     expect(readFileSync(join(homeDir, '.claude', 'skills', 'skill-existing-only', 'SKILL.md'), 'utf8')).toBe('# existing claude only')
   })
 
@@ -79,33 +79,82 @@ describe('runCodexInitial', () => {
     mkdirSync(join(packageRoot, 'skills', 'skill-a'), { recursive: true })
     mkdirSync(join(packageRoot, 'skills', 'pr-review-loop'), { recursive: true })
     mkdirSync(join(packageRoot, 'skills', 'git-commit-and-pr'), { recursive: true })
+    mkdirSync(join(packageRoot, 'skills', 'autospec'), { recursive: true })
     writeFileSync(join(packageRoot, 'skills', 'skill-a', 'SKILL.md'), '# skill a')
     writeFileSync(join(packageRoot, 'skills', 'pr-review-loop', 'SKILL.md'), '# source deprecated')
     writeFileSync(join(packageRoot, 'skills', 'git-commit-and-pr', 'SKILL.md'), '# source deprecated')
+    writeFileSync(join(packageRoot, 'skills', 'autospec', 'SKILL.md'), '# source deprecated autospec')
 
     mkdirSync(join(homeDir, '.codex', 'skills', 'pr-review-loop'), { recursive: true })
     mkdirSync(join(homeDir, '.codex', 'skills', 'git-commit-and-pr'), { recursive: true })
+    mkdirSync(join(homeDir, '.codex', 'skills', 'autospec'), { recursive: true })
     mkdirSync(join(homeDir, '.codex', 'skills', 'keep-skill'), { recursive: true })
     writeFileSync(join(homeDir, '.codex', 'skills', 'pr-review-loop', 'SKILL.md'), '# deprecated')
     writeFileSync(join(homeDir, '.codex', 'skills', 'git-commit-and-pr', 'SKILL.md'), '# deprecated')
+    writeFileSync(join(homeDir, '.codex', 'skills', 'autospec', 'SKILL.md'), '# deprecated autospec')
     writeFileSync(join(homeDir, '.codex', 'skills', 'keep-skill', 'SKILL.md'), '# keep')
 
     mkdirSync(join(homeDir, '.claude', 'skills', 'pr-review-loop'), { recursive: true })
     mkdirSync(join(homeDir, '.claude', 'skills', 'git-commit-and-pr'), { recursive: true })
+    mkdirSync(join(homeDir, '.claude', 'skills', 'autospec'), { recursive: true })
     mkdirSync(join(homeDir, '.claude', 'skills', 'keep-skill'), { recursive: true })
     writeFileSync(join(homeDir, '.claude', 'skills', 'pr-review-loop', 'SKILL.md'), '# deprecated')
     writeFileSync(join(homeDir, '.claude', 'skills', 'git-commit-and-pr', 'SKILL.md'), '# deprecated')
+    writeFileSync(join(homeDir, '.claude', 'skills', 'autospec', 'SKILL.md'), '# deprecated autospec')
     writeFileSync(join(homeDir, '.claude', 'skills', 'keep-skill', 'SKILL.md'), '# keep')
 
     await runCodexInitial({ packageRoot, homeDir })
 
     expect(existsSync(join(homeDir, '.codex', 'skills', 'pr-review-loop'))).toBe(false)
     expect(existsSync(join(homeDir, '.codex', 'skills', 'git-commit-and-pr'))).toBe(false)
+    expect(existsSync(join(homeDir, '.codex', 'skills', 'autospec'))).toBe(false)
     expect(readFileSync(join(homeDir, '.codex', 'skills', 'keep-skill', 'SKILL.md'), 'utf8')).toBe('# keep')
 
     expect(existsSync(join(homeDir, '.claude', 'skills', 'pr-review-loop'))).toBe(false)
     expect(existsSync(join(homeDir, '.claude', 'skills', 'git-commit-and-pr'))).toBe(false)
+    expect(existsSync(join(homeDir, '.claude', 'skills', 'autospec'))).toBe(false)
     expect(readFileSync(join(homeDir, '.claude', 'skills', 'keep-skill', 'SKILL.md'), 'utf8')).toBe('# keep')
+  })
+
+  test('removes stale temporary skill directories before syncing', async () => {
+    mkdirSync(join(packageRoot, 'skills', 'skill-a'), { recursive: true })
+    writeFileSync(join(packageRoot, 'skills', 'skill-a', 'SKILL.md'), '# skill a')
+
+    mkdirSync(join(homeDir, '.codex', 'skills', '.skill-a.tmp-123-456'), { recursive: true })
+    mkdirSync(join(homeDir, '.codex', 'skills', '.skill-a.backup-123-456'), { recursive: true })
+    mkdirSync(join(homeDir, '.claude', 'skills', '.skill-a.tmp-123-456'), { recursive: true })
+    mkdirSync(join(homeDir, '.claude', 'skills', '.skill-a.backup-123-456'), { recursive: true })
+
+    await runCodexInitial({ packageRoot, homeDir })
+
+    expect(existsSync(join(homeDir, '.codex', 'skills', '.skill-a.tmp-123-456'))).toBe(false)
+    expect(existsSync(join(homeDir, '.codex', 'skills', '.skill-a.backup-123-456'))).toBe(false)
+    expect(existsSync(join(homeDir, '.claude', 'skills', '.skill-a.tmp-123-456'))).toBe(false)
+    expect(existsSync(join(homeDir, '.claude', 'skills', '.skill-a.backup-123-456'))).toBe(false)
+  })
+
+  test('restores existing skill directory when replacement fails after backup', async () => {
+    mkdirSync(join(packageRoot, 'skills', 'skill-a'), { recursive: true })
+    writeFileSync(join(packageRoot, 'skills', 'skill-a', 'SKILL.md'), '# new skill a')
+
+    mkdirSync(join(homeDir, '.codex', 'skills', 'skill-a'), { recursive: true })
+    writeFileSync(join(homeDir, '.codex', 'skills', 'skill-a', 'SKILL.md'), '# old skill a')
+
+    const originalRename = renameSync
+    const renameSpy = jest.spyOn(fsPromises, 'rename').mockImplementation(async (from, to) => {
+      if (String(to).endsWith('/skill-a') && String(from).includes('.skill-a.tmp-')) {
+        throw new Error('rename failed')
+      }
+      originalRename(from, to)
+    })
+
+    try {
+      await expect(runCodexInitial({ packageRoot, homeDir })).rejects.toThrow('rename failed')
+    } finally {
+      renameSpy.mockRestore()
+    }
+
+    expect(readFileSync(join(homeDir, '.codex', 'skills', 'skill-a', 'SKILL.md'), 'utf8')).toBe('# old skill a')
   })
 
   test('throws when root skills directory is missing', async () => {
