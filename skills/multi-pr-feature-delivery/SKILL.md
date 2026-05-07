@@ -149,7 +149,7 @@ Track A 完成判据：PR 已 `--auto` 设定且 CI 绿后会自动 merge to mai
 **流程**：
 
 1. 落盘实施计划：`docs/superpowers/plans/YYYY-MM-DD-<topic>.md`（**不写 spec**，需求直接来源于对话上下文）
-2. 计划用 autospec 的 Task 结构（Files / Steps / Verify / Commit），粒度 2-5 分钟每 Task
+2. 计划使用本 skill 内置 Task 结构：Files / Steps / Verify / Commit，粒度 2-5 分钟每 Task
 3. **Issue Gate**：plan 落盘后立即 `gh issue list` 查重；无则 `gh issue create` 按 Issue 模板创建，"方案"段引用 `docs/superpowers/plans/YYYY-MM-DD-<topic>.md` 路径
 4. 派 `oh-my-claudecode:critic` 审一轮：仅审 import 路径真实性 / 路由冲突 / DTO 签名 / 遗漏覆盖；critic 报告落盘 `.omc/plans/<topic>-critic.md`
 5. **错误必修，遗漏必补**；建议级酌情。允许只跑一轮（中等改动不强制 ≤3 轮上限）
@@ -193,7 +193,7 @@ Track A 完成判据：PR 已 `--auto` 设定且 CI 绿后会自动 merge to mai
 
 ### PR 1: feat: schema + writer
 **Files:** Create / Modify 列表
-**Tasks:** 同 autospec 的 Task 格式（每步完整代码、Verify、Commit）
+**Tasks:** 使用本 skill 内置 Task 结构（每步完整代码、Verify、Commit）
 **Sentinel:**（如需）哨兵 SQL 查询模板
 ```
 
@@ -375,7 +375,7 @@ digraph cycle {
 ## 审核报告（第 N 轮）
 ### 概要：Critical X / Major Y / Minor Z
 ### Critical 问题（表）
-### Major 问题（表）  
+### Major 问题（表）
 ### Minor 问题（表）
 ### 处理决策：逐条标 修/拒（拒绝附 ≥1 句理由）
 ### 验证流水线（lint/build/test/migration grid）
@@ -481,7 +481,6 @@ done
 ## Tie-In With Existing Skills
 
 - `superpowers:brainstorming` — 首 PR 设计阶段（PR1 前）使用；critic escalate 时回到此
-- `autospec` — 单 PR 内的 spec→plan→execute 自动化；本 skill 在多 PR 之上调度它
 - `git-pr-ship` — 单 PR 的 review→fix→ship 收尾流程
 - `oh-my-claudecode:critic` agent — 通过 `Task` tool 调度（注：是 agent 不是 skill，无 `Skill` 工具入口）
 
