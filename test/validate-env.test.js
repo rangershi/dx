@@ -185,6 +185,26 @@ describe('validateEnvironment() - Subdir Layout Scanning', () => {
     expect(() => validateEnvironment()).not.toThrow()
   })
 
+  it('should ignore tool metadata worktrees when scanning subdir env files', async () => {
+    process.env.DX_PROJECT_ROOT = tempDir
+    process.env.DX_CONFIG_DIR = join(tempDir, 'dx/config')
+
+    createMinimalPolicy(tempDir)
+
+    const claudeWorktreeDir = join(tempDir, '.claude/worktrees/agent-123')
+    mkdirSync(claudeWorktreeDir, { recursive: true })
+    writeEnvFile(claudeWorktreeDir, '.env.development', { FOO: 'bar' })
+    writeEnvFile(claudeWorktreeDir, '.env.local', { FOO: 'bar' })
+
+    const codexDir = join(tempDir, '.codex/cache')
+    mkdirSync(codexDir, { recursive: true })
+    writeEnvFile(codexDir, '.env.test', { FOO: 'bar' })
+
+    const { validateEnvironment } = await import('../lib/validate-env.js')
+
+    expect(() => validateEnvironment()).not.toThrow()
+  })
+
   it('should allow apps/<any>/.env.* via mid-segment glob apps/*/.env*', async () => {
     process.env.DX_PROJECT_ROOT = tempDir
     process.env.DX_CONFIG_DIR = join(tempDir, 'dx/config')
