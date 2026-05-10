@@ -221,8 +221,9 @@ dx test e2e quantify apps/quantify/e2e/health/health.e2e-spec.ts
 
 关于 `dx initial`：
 
-- `dx initial` 会把 npm 包内置的 `skills/` 同步到 `~/.codex/skills` 与 `~/.claude/skills`。
-- 包内管理的同名 skill 目录会按当前包内容替换；旧版本中已删除的官方 skill 会被清理。
+- `dx initial` 会把 npm 包内置的 `skills/` 覆盖同步到 `~/.agents/skills`。
+- `~/.claude/skills` 中包内管理的同名非软链接 skill 会先删除，再创建指向 `~/.agents/skills` 的软链接。
+- `~/.codex/skills` 中包内管理的同名非软链接 skill 会被清理；已有软链接不会按旧副本删除。
 - 不属于包内管理的其他用户自有 skill 目录会保留。
 
 关于 `help`：
