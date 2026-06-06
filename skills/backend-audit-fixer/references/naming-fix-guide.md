@@ -78,14 +78,19 @@ dx build admin --dev
 | Hook .ts | camelCase | `useChat.ts` |
 | 路由文件 | 小写 | `page.tsx`, `layout.tsx` |
 | 目录 | kebab-case | `character/`（单数） |
-| ui/ | kebab-case | `button.tsx` |
+| ui/ | kebab-case（shadcn 原生，**豁免 PascalCase**） | `button.tsx` |
+| 点号描述符 | 保留，仅 base 段 kebab | `announcement-popup.storage.ts` ✅ |
 
-### Vite + React
+### Vite + React（admin-front）
 
-与 Next.js 相同，但无路由文件约束。
+组件/工具命名同 Next.js。但 **`pages/**` 走 vite-plugin-pages 文件路由**：文件名即 URL，`.tsx` 改名属破坏性，默认不动（见高风险注意）。
 
 ## 高风险操作注意
 
+- **vite-plugin-pages 文件路由（admin-front 最高危）**：`pages/**` 文件名即 URL。改名前 `rg "vite-plugin-pages|react-pages"`；命中则 `pages/**/*.tsx` 默认不改（改名 = 改 URL，且常无 import 纯靠路由存活，改完直接失联）。确需改：同步改 Pages `exclude` 或确认 URL 可变更并手测路由可达。
+- **点号是描述符不是违规**：§10 认可 `.storage`/`.toggle`/`.core` 等描述符点号。改名**只动 base 段大小写**，保留点号（`CharactersPane.sub-normalize.ts`→`characters-pane.sub-normalize.ts`，不要拍平成 `characters-pane-sub-normalize.ts`）。
+- **macOS 大小写不敏感**：`git mv MessageCenter message-center` 仅改大小写可能失败，需中间名过渡（`MessageCenter`→`message-center-tmp`→`message-center`）。
+- **深引用 vs barrel**：改目录名前先 `rg` 确认外部走深路径还是 barrel——别假设走 index.ts，本仓实测外部全是 `Dir/Component` 深引用、barrel 零外部消费。
 - **barrel export (index.ts)**：重命名后检查是否有 `export * from './old-name'`
 - **动态 import**：`import()` 表达式中的路径也需要更新
 - **tsconfig paths**：如果 tsconfig 中配置了路径别名指向具体文件，也需更新
