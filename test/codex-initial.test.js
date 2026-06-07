@@ -143,6 +143,43 @@ describe('runCodexInitial', () => {
     expect(readFileSync(join(homeDir, '.agents', 'skills', 'autospec', 'SKILL.md'), 'utf8')).toBe('# source deprecated autospec')
   })
 
+  test('purges historically deleted skills from ~/.agents, ~/.claude, and ~/.codex (real dirs and symlinks)', async () => {
+    mkdirSync(join(packageRoot, 'skills', 'skill-a'), { recursive: true })
+    writeFileSync(join(packageRoot, 'skills', 'skill-a', 'SKILL.md'), '# skill a')
+
+    // autospec 是硬编码的历史已删除 skill
+    // agents: 真实目录副本
+    mkdirSync(join(homeDir, '.agents', 'skills', 'autospec'), { recursive: true })
+    writeFileSync(join(homeDir, '.agents', 'skills', 'autospec', 'SKILL.md'), '# stale agents')
+    // codex: 真实目录副本
+    mkdirSync(join(homeDir, '.codex', 'skills', 'autospec'), { recursive: true })
+    writeFileSync(join(homeDir, '.codex', 'skills', 'autospec', 'SKILL.md'), '# stale codex')
+    // claude: 指向 agents 的软链
+    mkdirSync(join(homeDir, '.claude', 'skills'), { recursive: true })
+    symlinkSync(
+      join(homeDir, '.agents', 'skills', 'autospec'),
+      join(homeDir, '.claude', 'skills', 'autospec'),
+      'dir',
+    )
+
+    await runCodexInitial({ packageRoot, homeDir })
+
+    expect(existsSync(join(homeDir, '.agents', 'skills', 'autospec'))).toBe(false)
+    expect(existsSync(join(homeDir, '.codex', 'skills', 'autospec'))).toBe(false)
+    // 软链本身被删除（lstat 应抛 ENOENT）
+    expect(existsSync(join(homeDir, '.claude', 'skills', 'autospec'))).toBe(false)
+    let claudeLinkExists = true
+    try {
+      lstatSync(join(homeDir, '.claude', 'skills', 'autospec'))
+    } catch {
+      claudeLinkExists = false
+    }
+    expect(claudeLinkExists).toBe(false)
+
+    // 现存 skill 仍正常同步
+    expect(existsSync(join(homeDir, '.agents', 'skills', 'skill-a', 'SKILL.md'))).toBe(true)
+  })
+
   test('removes stale temporary skill directories before syncing', async () => {
     mkdirSync(join(packageRoot, 'skills', 'skill-a'), { recursive: true })
     writeFileSync(join(packageRoot, 'skills', 'skill-a', 'SKILL.md'), '# skill a')
