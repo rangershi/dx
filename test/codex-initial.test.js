@@ -103,44 +103,108 @@ describe('runCodexInitial', () => {
     mkdirSync(join(packageRoot, 'skills', 'skill-a'), { recursive: true })
     mkdirSync(join(packageRoot, 'skills', 'pr-review-loop'), { recursive: true })
     mkdirSync(join(packageRoot, 'skills', 'git-commit-and-pr'), { recursive: true })
-    mkdirSync(join(packageRoot, 'skills', 'autospec'), { recursive: true })
+    mkdirSync(join(packageRoot, 'skills', 'skill-c'), { recursive: true })
     writeFileSync(join(packageRoot, 'skills', 'skill-a', 'SKILL.md'), '# skill a')
     writeFileSync(join(packageRoot, 'skills', 'pr-review-loop', 'SKILL.md'), '# source deprecated')
     writeFileSync(join(packageRoot, 'skills', 'git-commit-and-pr', 'SKILL.md'), '# source deprecated')
-    writeFileSync(join(packageRoot, 'skills', 'autospec', 'SKILL.md'), '# source deprecated autospec')
+    writeFileSync(join(packageRoot, 'skills', 'skill-c', 'SKILL.md'), '# source skill c')
 
     mkdirSync(join(homeDir, '.codex', 'skills', 'pr-review-loop'), { recursive: true })
     mkdirSync(join(homeDir, '.codex', 'skills', 'git-commit-and-pr'), { recursive: true })
-    mkdirSync(join(homeDir, '.codex', 'skills', 'autospec'), { recursive: true })
+    mkdirSync(join(homeDir, '.codex', 'skills', 'skill-c'), { recursive: true })
     mkdirSync(join(homeDir, '.codex', 'skills', 'keep-skill'), { recursive: true })
     writeFileSync(join(homeDir, '.codex', 'skills', 'pr-review-loop', 'SKILL.md'), '# deprecated')
     writeFileSync(join(homeDir, '.codex', 'skills', 'git-commit-and-pr', 'SKILL.md'), '# deprecated')
-    writeFileSync(join(homeDir, '.codex', 'skills', 'autospec', 'SKILL.md'), '# deprecated autospec')
+    writeFileSync(join(homeDir, '.codex', 'skills', 'skill-c', 'SKILL.md'), '# old skill c')
     writeFileSync(join(homeDir, '.codex', 'skills', 'keep-skill', 'SKILL.md'), '# keep')
 
     mkdirSync(join(homeDir, '.claude', 'skills', 'pr-review-loop'), { recursive: true })
     mkdirSync(join(homeDir, '.claude', 'skills', 'git-commit-and-pr'), { recursive: true })
-    mkdirSync(join(homeDir, '.claude', 'skills', 'autospec'), { recursive: true })
+    mkdirSync(join(homeDir, '.claude', 'skills', 'skill-c'), { recursive: true })
     mkdirSync(join(homeDir, '.claude', 'skills', 'keep-skill'), { recursive: true })
     writeFileSync(join(homeDir, '.claude', 'skills', 'pr-review-loop', 'SKILL.md'), '# deprecated')
     writeFileSync(join(homeDir, '.claude', 'skills', 'git-commit-and-pr', 'SKILL.md'), '# deprecated')
-    writeFileSync(join(homeDir, '.claude', 'skills', 'autospec', 'SKILL.md'), '# deprecated autospec')
+    writeFileSync(join(homeDir, '.claude', 'skills', 'skill-c', 'SKILL.md'), '# old skill c')
     writeFileSync(join(homeDir, '.claude', 'skills', 'keep-skill', 'SKILL.md'), '# keep')
 
     await runCodexInitial({ packageRoot, homeDir })
 
     expect(existsSync(join(homeDir, '.codex', 'skills', 'pr-review-loop'))).toBe(false)
     expect(existsSync(join(homeDir, '.codex', 'skills', 'git-commit-and-pr'))).toBe(false)
-    expect(existsSync(join(homeDir, '.codex', 'skills', 'autospec'))).toBe(false)
+    expect(existsSync(join(homeDir, '.codex', 'skills', 'skill-c'))).toBe(false)
     expect(readFileSync(join(homeDir, '.codex', 'skills', 'keep-skill', 'SKILL.md'), 'utf8')).toBe('# keep')
 
     expect(lstatSync(join(homeDir, '.claude', 'skills', 'pr-review-loop')).isSymbolicLink()).toBe(true)
     expect(lstatSync(join(homeDir, '.claude', 'skills', 'git-commit-and-pr')).isSymbolicLink()).toBe(true)
-    expect(lstatSync(join(homeDir, '.claude', 'skills', 'autospec')).isSymbolicLink()).toBe(true)
+    expect(lstatSync(join(homeDir, '.claude', 'skills', 'skill-c')).isSymbolicLink()).toBe(true)
     expect(readFileSync(join(homeDir, '.claude', 'skills', 'keep-skill', 'SKILL.md'), 'utf8')).toBe('# keep')
     expect(readFileSync(join(homeDir, '.agents', 'skills', 'pr-review-loop', 'SKILL.md'), 'utf8')).toBe('# source deprecated')
     expect(readFileSync(join(homeDir, '.agents', 'skills', 'git-commit-and-pr', 'SKILL.md'), 'utf8')).toBe('# source deprecated')
-    expect(readFileSync(join(homeDir, '.agents', 'skills', 'autospec', 'SKILL.md'), 'utf8')).toBe('# source deprecated autospec')
+    expect(readFileSync(join(homeDir, '.agents', 'skills', 'skill-c', 'SKILL.md'), 'utf8')).toBe('# source skill c')
+  })
+
+  test('purges historically deleted skills from ~/.agents, ~/.claude, and ~/.codex (real dirs and symlinks)', async () => {
+    mkdirSync(join(packageRoot, 'skills', 'skill-a'), { recursive: true })
+    writeFileSync(join(packageRoot, 'skills', 'skill-a', 'SKILL.md'), '# skill a')
+
+    // autospec 是硬编码的历史已删除 skill
+    // agents: 真实目录副本
+    mkdirSync(join(homeDir, '.agents', 'skills', 'autospec'), { recursive: true })
+    writeFileSync(join(homeDir, '.agents', 'skills', 'autospec', 'SKILL.md'), '# stale agents')
+    // codex: 真实目录副本
+    mkdirSync(join(homeDir, '.codex', 'skills', 'autospec'), { recursive: true })
+    writeFileSync(join(homeDir, '.codex', 'skills', 'autospec', 'SKILL.md'), '# stale codex')
+    // claude: 指向 agents 的软链（agents target 同样是已删除 skill，会被 purgeAgents 删）
+    mkdirSync(join(homeDir, '.claude', 'skills'), { recursive: true })
+    symlinkSync(
+      join(homeDir, '.agents', 'skills', 'autospec'),
+      join(homeDir, '.claude', 'skills', 'autospec'),
+      'dir',
+    )
+
+    // 第二个已删除 skill omc-reference：claude 软链指向 agents 之外的独立目录，
+    // 用以独立验证"软链本身被删除"而非依赖 purgeAgents 巧合删掉 target。
+    const externalTarget = join(homeDir, 'external-omc-reference')
+    mkdirSync(externalTarget, { recursive: true })
+    writeFileSync(join(externalTarget, 'SKILL.md'), '# external target')
+    symlinkSync(externalTarget, join(homeDir, '.claude', 'skills', 'omc-reference'), 'dir')
+
+    await runCodexInitial({ packageRoot, homeDir })
+
+    expect(existsSync(join(homeDir, '.agents', 'skills', 'autospec'))).toBe(false)
+    expect(existsSync(join(homeDir, '.codex', 'skills', 'autospec'))).toBe(false)
+    // autospec 软链本身被删除（lstat 应抛 ENOENT）
+    expect(existsSync(join(homeDir, '.claude', 'skills', 'autospec'))).toBe(false)
+    let autospecLink = true
+    try {
+      lstatSync(join(homeDir, '.claude', 'skills', 'autospec'))
+    } catch {
+      autospecLink = false
+    }
+    expect(autospecLink).toBe(false)
+
+    // omc-reference 软链被独立删除（lstat 抛 ENOENT），而其外部 target 不受影响——
+    // 证明 purge 删的是软链本身，不依赖 target 恰好也在 agents 被删。
+    let omcLink = true
+    try {
+      lstatSync(join(homeDir, '.claude', 'skills', 'omc-reference'))
+    } catch {
+      omcLink = false
+    }
+    expect(omcLink).toBe(false)
+    expect(existsSync(join(externalTarget, 'SKILL.md'))).toBe(true)
+
+    // 现存 skill 仍正常同步
+    expect(existsSync(join(homeDir, '.agents', 'skills', 'skill-a', 'SKILL.md'))).toBe(true)
+  })
+
+  test('throws when DELETED_SKILLS overlaps an existing packaged skill', async () => {
+    // autospec 在 DELETED_SKILLS 名单内；若它又出现在 skills/ 现存模板中，
+    // 必须抛错而非把刚同步的 skill 又删掉。
+    mkdirSync(join(packageRoot, 'skills', 'autospec'), { recursive: true })
+    writeFileSync(join(packageRoot, 'skills', 'autospec', 'SKILL.md'), '# resurrected')
+
+    await expect(runCodexInitial({ packageRoot, homeDir })).rejects.toThrow('DELETED_SKILLS')
   })
 
   test('removes stale temporary skill directories before syncing', async () => {
