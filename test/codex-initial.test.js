@@ -180,6 +180,15 @@ describe('runCodexInitial', () => {
     expect(existsSync(join(homeDir, '.agents', 'skills', 'skill-a', 'SKILL.md'))).toBe(true)
   })
 
+  test('throws when DELETED_SKILLS overlaps an existing packaged skill', async () => {
+    // autospec 在 DELETED_SKILLS 名单内；若它又出现在 skills/ 现存模板中，
+    // 必须抛错而非把刚同步的 skill 又删掉。
+    mkdirSync(join(packageRoot, 'skills', 'autospec'), { recursive: true })
+    writeFileSync(join(packageRoot, 'skills', 'autospec', 'SKILL.md'), '# resurrected')
+
+    await expect(runCodexInitial({ packageRoot, homeDir })).rejects.toThrow('DELETED_SKILLS')
+  })
+
   test('removes stale temporary skill directories before syncing', async () => {
     mkdirSync(join(packageRoot, 'skills', 'skill-a'), { recursive: true })
     writeFileSync(join(packageRoot, 'skills', 'skill-a', 'SKILL.md'), '# skill a')
