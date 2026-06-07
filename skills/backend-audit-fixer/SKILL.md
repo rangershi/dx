@@ -1,6 +1,6 @@
 ---
 name: backend-audit-fixer
-description: Use when 需要对后端（NestJS/backend）做合规审计或修复，覆盖三层架构与事务规范、E2E 测试可维护性、process.env 直读、DomainException/ErrorCode 错误处理、文件命名规范、分页 DTO 规范中的一项或多项。也用于"全量后端审计""扫一遍规范""检查合规"等批量审计请求。
+description: 必须显式调用才触发
 ---
 
 # 后端规范审计与修复（伞 skill）
