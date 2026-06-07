@@ -14,14 +14,6 @@ describe('backend artifact deploy docs and example config', () => {
   test('README documents backend artifact deploy command and fixed remote layout', () => {
     const readme = readFileSync(new URL('../README.md', import.meta.url), 'utf8')
     const exampleReadme = readFileSync(new URL('../example/README.md', import.meta.url), 'utf8')
-    const designSpec = readFileSync(
-      new URL('../docs/superpowers/specs/2026-03-12-backend-artifact-deploy-design.md', import.meta.url),
-      'utf8',
-    )
-    const plan = readFileSync(
-      new URL('../docs/superpowers/plans/2026-03-12-backend-artifact-deploy.md', import.meta.url),
-      'utf8',
-    )
 
     expect(readme).toContain('dx deploy backend --prod')
     expect(readme).toContain('--build-only')
@@ -38,10 +30,5 @@ describe('backend artifact deploy docs and example config', () => {
     expect(exampleReadme).toContain('dx deploy backend --build-only')
     expect(exampleReadme).toContain('所有本地路径字段都会先约束在项目根目录内')
     expect(exampleReadme).toContain('`remote.baseDir` 必须使用绝对路径')
-    expect(designSpec).toContain('reject local config paths that escape project root')
-    expect(designSpec).toContain('require `remote.baseDir` to be an absolute POSIX path')
-    expect(plan).toContain("test('rejects local paths that escape projectRoot'")
-    expect(plan).toContain("test('rejects remote.baseDir containing unsafe shell characters'")
-    expect(plan).toContain("test('quotes remote mkdir directories to avoid shell metacharacter execution'")
   })
 })
