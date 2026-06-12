@@ -97,6 +97,61 @@ describe('resolveBackendDeployConfig', () => {
     expect(config.remote).toBeNull()
   })
 
+  test('selects environment-specific remote config when remote is keyed by environment', () => {
+    const targetConfig = createTargetConfig()
+    targetConfig.backendDeploy.remote = {
+      staging: {
+        host: 'ai-staging',
+        port: 22,
+        user: 'ubuntu',
+        baseDir: '/home/ubuntu/work/paycenter',
+      },
+      production: {
+        host: 'ai-ubuntu-prod',
+        port: 22,
+        user: 'ubuntu',
+        baseDir: '/home/ubuntu/work/paycenter',
+      },
+    }
+
+    const stagingConfig = resolveBackendDeployConfig({
+      cli: createCli(),
+      targetConfig,
+      environment: 'staging',
+      flags: {},
+    })
+    const productionConfig = resolveBackendDeployConfig({
+      cli: createCli(),
+      targetConfig,
+      environment: 'production',
+      flags: {},
+    })
+
+    expect(stagingConfig.remote.host).toBe('ai-staging')
+    expect(productionConfig.remote.host).toBe('ai-ubuntu-prod')
+  })
+
+  test('fails clearly when environment-specific remote config is missing', () => {
+    const targetConfig = createTargetConfig()
+    targetConfig.backendDeploy.remote = {
+      staging: {
+        host: 'ai-staging',
+        port: 22,
+        user: 'ubuntu',
+        baseDir: '/home/ubuntu/work/paycenter',
+      },
+    }
+
+    expect(() =>
+      resolveBackendDeployConfig({
+        cli: createCli(),
+        targetConfig,
+        environment: 'production',
+        flags: {},
+      }),
+    ).toThrow('remote.production')
+  })
+
   test('supports single build.command form for all environments', () => {
     const targetConfig = createTargetConfig()
     targetConfig.backendDeploy.build = {

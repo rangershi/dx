@@ -11,7 +11,7 @@ describe('backend artifact deploy docs and example config', () => {
     expect(config.deploy.backend.backendDeploy.remote.baseDir).toBe('/srv/example-app')
   })
 
-  test('README documents backend artifact deploy command and fixed remote layout', () => {
+  test('README documents backend artifact deploy command and remote layouts', () => {
     const readme = readFileSync(new URL('../README.md', import.meta.url), 'utf8')
     const exampleReadme = readFileSync(new URL('../example/README.md', import.meta.url), 'utf8')
 
@@ -26,6 +26,9 @@ describe('backend artifact deploy docs and example config', () => {
     expect(readme).toContain('所有本地路径字段都会被解析为相对项目根目录')
     expect(readme).toContain('`remote.baseDir` 必须是绝对路径')
     expect(readme).toContain('只能包含 `/`、字母、数字、`.`、`_`、`-`')
+    expect(readme).toContain('`remote.staging` / `remote.production`')
+    expect(readme).toContain('dx deploy backend --staging')
+    expect(readme).toContain('ai-ubuntu-prod')
     expect(exampleReadme).toContain('internal: "backend-artifact-deploy"')
     expect(exampleReadme).toContain('dx deploy backend --build-only')
     expect(exampleReadme).toContain('所有本地路径字段都会先约束在项目根目录内')

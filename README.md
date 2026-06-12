@@ -463,6 +463,7 @@ SSH 认证说明：
 - `dx deploy backend` 当前直接调用系统 `ssh` / `scp`，不会单独解析 `sshKey`、`identityFile` 之类的 dx 配置项。
 - 因此，发布使用哪把私钥，取决于本机 OpenSSH 的默认认证行为，例如 `ssh-agent`、`~/.ssh/config`、默认私钥文件等。
 - 如果你已经在 `~/.ssh/config` 中配置了主机别名（例如 `Host ai-staging`），推荐直接把 `backendDeploy.remote.host` 写成这个别名，让 OpenSSH 自动匹配对应的 `HostName`、`User`、`Port`、`IdentityFile`。
+- `backendDeploy.remote` 可以保持旧的单远端对象；也可以按环境拆成 `remote.staging` / `remote.production`，此时 `dx deploy backend --staging` 与 `dx deploy backend --prod` 会选择对应环境的远端。
 
 例如本机 `~/.ssh/config`：
 
@@ -487,6 +488,34 @@ Host ai-staging
           "port": 22,
           "user": "deploy",
           "baseDir": "/srv/example-app"
+        }
+      }
+    }
+  }
+}
+```
+
+按环境区分远端时：
+
+```json
+{
+  "deploy": {
+    "backend": {
+      "internal": "backend-artifact-deploy",
+      "backendDeploy": {
+        "remote": {
+          "staging": {
+            "host": "ai-staging",
+            "port": 22,
+            "user": "deploy",
+            "baseDir": "/srv/example-app"
+          },
+          "production": {
+            "host": "ai-ubuntu-prod",
+            "port": 22,
+            "user": "deploy",
+            "baseDir": "/srv/example-app"
+          }
         }
       }
     }
