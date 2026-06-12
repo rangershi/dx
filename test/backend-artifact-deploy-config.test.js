@@ -334,6 +334,34 @@ describe('resolveBackendDeployConfig', () => {
     })
   })
 
+  test('supports health check URL built from runtime env PORT', () => {
+    const targetConfig = createTargetConfig()
+    targetConfig.backendDeploy.verify.healthCheck = {
+      envPort: 'PORT',
+      path: '/api/v1/health',
+      timeoutSeconds: 10,
+      maxWaitSeconds: 24,
+      retryIntervalSeconds: 2,
+    }
+
+    const config = resolveBackendDeployConfig({
+      cli: createCli(),
+      targetConfig,
+      environment: 'production',
+      flags: {},
+    })
+
+    expect(config.verify).toEqual({
+      healthCheck: {
+        envPort: 'PORT',
+        path: '/api/v1/health',
+        timeoutSeconds: 10,
+        maxWaitSeconds: 24,
+        retryIntervalSeconds: 2,
+      },
+    })
+  })
+
   test('rejects invalid verify.healthCheck values', () => {
     const missingUrl = createTargetConfig()
     delete missingUrl.backendDeploy.verify.healthCheck.url
@@ -382,6 +410,18 @@ describe('resolveBackendDeployConfig', () => {
         flags: {},
       }),
     ).toThrow('verify.healthCheck.retryIntervalSeconds')
+
+    const invalidEnvPort = createTargetConfig()
+    invalidEnvPort.backendDeploy.verify.healthCheck = { envPort: 'PORT-NOPE' }
+
+    expect(() =>
+      resolveBackendDeployConfig({
+        cli: createCli(),
+        targetConfig: invalidEnvPort,
+        environment: 'production',
+        flags: {},
+      }),
+    ).toThrow('verify.healthCheck.envPort')
   })
 
 })

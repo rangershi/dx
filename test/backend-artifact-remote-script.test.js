@@ -129,4 +129,24 @@ describe('remote deploy script', () => {
     expect(script).toContain('HEALTHCHECK_URL=')
     expect(script).toContain('if [[ -n "$HEALTHCHECK_URL" ]]; then')
   })
+
+  test('builds health check URL from runtime PORT env when envPort is configured', () => {
+    const payload = createPayload()
+    payload.verify.healthCheck = {
+      envPort: 'PORT',
+      path: '/api/v1/health',
+      timeoutSeconds: 10,
+      maxWaitSeconds: 24,
+      retryIntervalSeconds: 2,
+    }
+
+    const script = buildRemoteDeployScript(createRemotePhaseModel(payload))
+
+    expect(script).toContain('HEALTHCHECK_ENV_PORT=\'PORT\'')
+    expect(script).toContain('HEALTHCHECK_PATH=\'/api/v1/health\'')
+    expect(script).toContain('resolve_healthcheck_url')
+    expect(script).toContain('healthcheck_port="$(run_with_env "$CURRENT_LINK" env | awk')
+    expect(script).toContain('HEALTHCHECK_URL="http://127.0.0.1:${healthcheck_port}${HEALTHCHECK_PATH}"')
+    expect(script).toContain('HEALTHCHECK_URL="$(resolve_healthcheck_url)"')
+  })
 })
