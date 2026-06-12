@@ -172,6 +172,27 @@ describe('deployToVercel()', () => {
     expect(logger.info).toHaveBeenCalledWith(expect.stringContaining('mode=prebuilt'))
   })
 
+  test('production deploy passes canonical APP_ENV and separate dx env flag', async () => {
+    const cwd = process.cwd()
+    writeFileSync(join(cwd, 'vercel.admin.json'), '{}')
+
+    const run = jest.fn().mockResolvedValue({ code: 0, stdout: '', stderr: '' })
+
+    await deployToVercel('admin', {
+      environment: 'production',
+      run,
+    })
+
+    expect(process.exitCode).toBeUndefined()
+    expect(run).toHaveBeenCalledTimes(2)
+
+    const buildEnv = run.mock.calls[0][1].env
+    expect(buildEnv.APP_ENV).toBe('production')
+    expect(buildEnv.VITE_APP_ENV).toBe('production')
+    expect(buildEnv.NEXT_PUBLIC_APP_ENV).toBe('production')
+    expect(buildEnv.DX_ENV_FLAG).toBe('--prod')
+  })
+
   test('deploy all keeps prebuilt mode while honoring target prebuilt cwd', async () => {
     const cwd = process.cwd()
     writeFileSync(join(cwd, 'vercel.front.json'), '{}')
