@@ -107,6 +107,24 @@ describe('dx test unit path forwarding', () => {
     expect(result.output).toContain(testPath)
   })
 
+  test('unit target with multiple paths appends every path to --runTestsByPath', () => {
+    const configDir = createTempConfigDir(createCommandsFixture())
+    const workspaceDir = createRunnableWorkspace()
+    const firstPath = 'apps/backend/src/modules/chat/chat.service.spec.ts'
+    const secondPath = 'apps/backend/src/modules/user/user.service.spec.ts'
+
+    const result = runDx(
+      ['--config-dir', configDir, 'test', 'unit', 'backend', firstPath, secondPath],
+      { cwd: workspaceDir },
+    )
+
+    expect(result.code).toBe(0)
+    expect(result.output).toContain('backend:test')
+    expect(result.output).toContain('--runTestsByPath')
+    expect(result.output).toContain(firstPath)
+    expect(result.output).toContain(secondPath)
+  })
+
   test('unit target with path and -t appends both filters', () => {
     const configDir = createTempConfigDir(createCommandsFixture())
     const workspaceDir = createRunnableWorkspace()
@@ -208,6 +226,33 @@ describe('dx test unit path forwarding', () => {
 
     expect(result.code).toBe(0)
     expect(result.output).toContain(`nx test front 'src/lib/url-param-persistence.test.ts'`)
+  })
+
+  test('nx vitest target rewrites and forwards multiple workspace paths', () => {
+    const configDir = createTempConfigDir(createCommandsFixture())
+    const workspaceDir = createRunnableWorkspace()
+    writeProjectConfig(workspaceDir, 'front', {
+      targets: {
+        test: {
+          options: {
+            command: 'vitest run',
+            cwd: 'apps/front',
+          },
+        },
+      },
+    })
+    const firstPath = 'apps/front/src/lib/i18n/config.spec.ts'
+    const secondPath = 'apps/front/src/components/provider/I18nProvider.spec.tsx'
+
+    const result = runDx(
+      ['--config-dir', configDir, 'test', 'unit', 'front', firstPath, secondPath],
+      { cwd: workspaceDir },
+    )
+
+    expect(result.code).toBe(0)
+    expect(result.output).toContain(
+      `nx test front 'src/lib/i18n/config.spec.ts' 'src/components/provider/I18nProvider.spec.tsx'`,
+    )
   })
 
   test('nx jest target rewrites workspace path to project-root relative path', () => {
