@@ -56,6 +56,9 @@ function createCli({ flags = {}, args = [], getWorktreeManager } = {}) {
 describe('compatibility purge batch 3', () => {
   beforeEach(() => {
     jest.clearAllMocks()
+    worktreeManager.repoRoot = '/tmp/dx'
+    worktreeManager.baseDir = '/tmp'
+    worktreeManager.prefix = 'dx_issue_'
     fsMock.existsSync.mockImplementation(() => false)
     delete process.exitCode
   })
