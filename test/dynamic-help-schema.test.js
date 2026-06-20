@@ -9,30 +9,38 @@ async function loadValidateHelpConfig() {
   return module.validateHelpConfig
 }
 
-function getRuntimeHelpContext() {
+async function loadStrictHelpValidationContext() {
+  const module = await import('../lib/cli/help-schema.js')
+  return module.buildStrictHelpValidationContext
+}
+
+function createRuntimeCli() {
   const argvBackup = process.argv
 
   try {
     process.argv = ['node', 'dx']
 
-    const cli = new DxCli({
+    return new DxCli({
       configDir: join(process.cwd(), 'example', 'dx', 'config'),
     })
-
-    const knownFlags = new Map()
-
-    for (const definitions of Object.values(cli.flagDefinitions)) {
-      for (const definition of definitions) {
-        knownFlags.set(definition.flag, definition)
-      }
-    }
-
-    return {
-      knownFlags,
-      registeredCommands: Object.keys(cli.commandHandlers),
-    }
   } finally {
     process.argv = argvBackup
+  }
+}
+
+function getRuntimeHelpContext() {
+  const cli = createRuntimeCli()
+  const knownFlags = new Map()
+
+  for (const definitions of Object.values(cli.flagDefinitions)) {
+    for (const definition of definitions) {
+      knownFlags.set(definition.flag, definition)
+    }
+  }
+
+  return {
+    knownFlags,
+    registeredCommands: Object.keys(cli.commandHandlers),
   }
 }
 
@@ -78,6 +86,28 @@ describe('dynamic help schema', () => {
     const commands = JSON.parse(readFileSync(file, 'utf8'))
 
     expect(() => validateHelpConfig(commands, getRuntimeHelpContext())).not.toThrow()
+  })
+
+  test('rejects e2e test usage with more than one path placeholder', async () => {
+    const validateHelpConfig = await loadValidateHelpConfig()
+    const buildStrictHelpValidationContext = await loadStrictHelpValidationContext()
+    const cli = createRuntimeCli()
+
+    expect(() =>
+      validateHelpConfig(
+        {
+          help: {
+            commands: {
+              test: {
+                summary: 'Run tests',
+                usage: 'dx test e2e backend <path> <extra>',
+              },
+            },
+          },
+        },
+        buildStrictHelpValidationContext(cli),
+      ),
+    ).toThrow('runtime allows 3')
   })
 
   test('rejects invalid command usage through usage validator callback', async () => {
