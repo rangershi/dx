@@ -7,7 +7,7 @@ description: 必须显式调用才触发
 
 ## 概览
 
-6 个后端审计维度的统一入口。规则太多，**一维度一 subagent，每次只跑一个**：用户每次选一个维度，派一个 subagent 只载那份 reference、只跑那个脚本，回来出该维度报告，再询问是否继续下一个。**不并行扇出、不一次跑全部。**
+7 个后端审计维度的统一入口。规则太多，**一维度一 subagent，每次只跑一个**：用户每次选一个维度，派一个 subagent 只载那份 reference、只跑那个脚本，回来出该维度报告，再询问是否继续下一个。**不并行扇出、不一次跑全部。**
 
 默认只审计出报告；用户明确说"修复/直接改"才进落代码阶段。
 
@@ -18,6 +18,7 @@ description: 必须显式调用才触发
 | backend-layering | references/backend-layering.md | 无（纯 rg） | conventions §4/§5/§6 |
 | e2e | references/e2e.md | scripts/e2e_audit.py | ruler/e2e-audit.md |
 | env-accessor | references/env-accessor.md | scripts/env_accessor_audit.py | conventions §2 |
+| enum-single-source | references/enum-single-source.md | scripts/enum_single_source_audit.py | 枚举唯一真源约定 |
 | error-handling | references/error-handling.md | scripts/error_handling_audit.py | conventions §9 |
 | naming | references/naming.md | scripts/naming_audit.py（需先拼 config） | conventions §10 |
 | pagination-dto | references/pagination-dto.md | scripts/pagination_dto_audit.py | conventions §12 |
@@ -29,18 +30,19 @@ description: 必须显式调用才触发
 **每次只跑一个维度。** 进入 skill 后：
 
 - 用户已点名某维度（"检查命名"/"分页规范"）→ 直接跑该维度，跳到 Step 2。
-- 用户说"全量审计/扫一遍/检查合规"或没点名 → **用纯文本列出下面 6 个维度的编号菜单**，让用户回复编号或维度名再继续。别默认全跑、别并行。
+- 用户说"全量审计/扫一遍/检查合规"或没点名 → **用纯文本列出下面 7 个维度的编号菜单**，让用户回复编号或维度名再继续。别默认全跑、别并行。
 
-> ⚠️ 不要用 AskUserQuestion 列维度：它每题最多 4 个选项，6 个维度会被截断。必须用文本菜单。
+> ⚠️ 不要用 AskUserQuestion 列维度：它每题最多 4 个选项，7 个维度会被截断。必须用文本菜单。
 
 ```
 请选择要审计的维度（每次只跑一个，回复编号或名字）：
 1. backend-layering  — 三层架构/事务/Repository 越层（conventions §4/§5/§6）
 2. e2e               — E2E 中文标题/手工 JWT/请求 helper/fixture 复用（ruler/e2e-audit.md）
 3. env-accessor      — 业务代码直读 process.env（conventions §2）
-4. error-handling    — 裸 BadRequestException/无 code HttpException（conventions §9）
-5. naming            — 文件/文件夹命名规范（conventions §10）
-6. pagination-dto    — 分页 DTO 未继承基类/手工拼装分页返回（conventions §12）
+4. enum-single-source — 枚举类型唯一真源/DB enum 生成链路/重复字面量
+5. error-handling    — 裸 BadRequestException/无 code HttpException（conventions §9）
+6. naming            — 文件/文件夹命名规范（conventions §10）
+7. pagination-dto    — 分页 DTO 未继承基类/手工拼装分页返回（conventions §12）
 ```
 
 ### Step 2：派 1 个 subagent 跑选中的维度
