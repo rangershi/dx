@@ -303,4 +303,32 @@ describe('dx test e2e target-specific fileCommand', () => {
     expect(result.code).toBe(0)
     expect(result.output).toContain('smoke full run')
   })
+
+  test('e2e target defaults to 8 workers', () => {
+    const configDir = createTempConfigDir(createCommandsFixture())
+    const workspaceDir = createRunnableWorkspace()
+    const testPath = 'apps/backend/e2e/auth/auth.login.e2e-spec.ts'
+
+    const result = runDx(['--config-dir', configDir, 'test', 'e2e', 'backend', testPath], {
+      cwd: workspaceDir,
+    })
+
+    expect(result.code).toBe(0)
+    expect(result.output).toContain('--workers=8')
+  })
+
+  test('e2e target keeps explicit passthrough worker count', () => {
+    const configDir = createTempConfigDir(createCommandsFixture())
+    const workspaceDir = createRunnableWorkspace()
+    const testPath = 'apps/backend/e2e/auth/auth.login.e2e-spec.ts'
+
+    const result = runDx(
+      ['--config-dir', configDir, 'test', 'e2e', 'backend', testPath, '--', '--workers=2'],
+      { cwd: workspaceDir },
+    )
+
+    expect(result.code).toBe(0)
+    expect(result.output).toContain('--workers=2')
+    expect(result.output).not.toContain('--workers=8')
+  })
 })

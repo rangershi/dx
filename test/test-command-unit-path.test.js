@@ -277,4 +277,32 @@ describe('dx test unit path forwarding', () => {
     expect(result.code).toBe(0)
     expect(result.output).toContain(`nx test backend 'src/modules/chat/chat.service.spec.ts'`)
   })
+
+  test('unit target defaults to 8 workers', () => {
+    const configDir = createTempConfigDir(createCommandsFixture())
+    const workspaceDir = createRunnableWorkspace()
+    const testPath = 'apps/backend/src/modules/chat/chat.service.spec.ts'
+
+    const result = runDx(['--config-dir', configDir, 'test', 'unit', 'backend', testPath], {
+      cwd: workspaceDir,
+    })
+
+    expect(result.code).toBe(0)
+    expect(result.output).toContain('--maxWorkers=8')
+  })
+
+  test('unit target keeps explicit passthrough worker count', () => {
+    const configDir = createTempConfigDir(createCommandsFixture())
+    const workspaceDir = createRunnableWorkspace()
+    const testPath = 'apps/backend/src/modules/chat/chat.service.spec.ts'
+
+    const result = runDx(
+      ['--config-dir', configDir, 'test', 'unit', 'backend', testPath, '--', '--maxWorkers=2'],
+      { cwd: workspaceDir },
+    )
+
+    expect(result.code).toBe(0)
+    expect(result.output).toContain('--maxWorkers=2')
+    expect(result.output).not.toContain('--maxWorkers=8')
+  })
 })
