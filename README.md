@@ -48,6 +48,7 @@ pnpm add -g @ranger1/dx@latest
 
 ```bash
 dx --help
+dx --version
 dx status
 ```
 
@@ -202,6 +203,23 @@ dx 的命令由 `dx/config/commands.json` 驱动，并且内置了一些 interna
 - `internal: start-dev`：开发环境一键启动
 - `internal: pm2-stack`：PM2 交互式服务栈（支持端口清理/缓存清理配置）
 
+内置命令入口速览：
+
+- `dx start [target]`：启动开发服务；未指定 target 时默认使用 `start.development`
+- `dx build [target]`：按当前环境构建；未指定 target 时默认 `all`
+- `dx test [unit|e2e] <target> [path...]`：运行测试；unit 自动使用 `--test` 环境，e2e 自动使用 `--e2e` 环境
+- `dx db <generate|migrate|deploy|reset|seed|format|script>`：数据库相关命令；`migrate` 仅允许 `--dev`
+- `dx deploy <target>`：部署目标；普通 Vercel target 默认 `--staging`，`backend-artifact-deploy` 默认 `--dev`
+- `dx lint [--fix]`：运行 lint；`--fix` 会透传给下游 runner
+- `dx install`：执行项目配置的安装命令
+- `dx clean [target]` / `dx cache clear`：执行清理类命令，危险操作会要求确认
+- `dx package backend [--skip-build]`：使用内置后端打包 runner
+- `dx worktree <make|del|list|clean>`：管理 issue worktree；这是 dx 封装，不等同于原生 `git worktree`
+- `dx export <target>`：执行配置化导出命令
+- `dx contracts [generate|pull]`：导出 OpenAPI 并生成 `packages/api-contracts` 下的 Zod 合约（需要目标工程具备对应结构）
+- `dx release version <version>`：同步更新常见 app 包版本号
+- `dx initial`：同步包内 skills 到本机 agent 目录
+
 常用示例：
 
 ```bash
@@ -214,10 +232,23 @@ dx db migrate --dev --name init
 dx db deploy --prod -Y
 dx deploy front --staging
 dx deploy backend --prod
+dx install
 dx lint
+dx lint --fix
+dx test unit backend apps/backend/src/modules/user/user.service.spec.ts
 dx test e2e backend apps/backend/e2e/auth
 dx test e2e quantify apps/quantify/e2e/health/health.e2e-spec.ts
+dx db script fix-email-verified-status --dev -- --dry-run
+dx package backend --prod --skip-build
+dx worktree make 88 --base main
+dx cache clear -Y
 ```
+
+测试命令默认并行度：
+
+- `dx test unit ...` 会自动追加 `--maxWorkers=8`
+- `dx test e2e ...` 会自动追加 `--workers=8`
+- 如果命令配置或 `--` 透传参数里已经指定了对应 worker 参数，dx 不会重复追加；例如 `dx test e2e backend apps/backend/e2e/auth -- --workers=2`
 
 关于 `dx initial`：
 
@@ -239,10 +270,15 @@ dx test e2e quantify apps/quantify/e2e/health/health.e2e-spec.ts
 
 - 对声明了 `requiresPath: true` 的 E2E target，`dx test e2e <target>` 必须提供文件或目录路径，禁止无路径或 `all` 全量执行
 - `dx test e2e all` 不受支持，必须显式指定 target 和路径
+- `dx test unit ...` 默认使用 8 个 worker；`dx test e2e ...` 默认使用 8 个 worker；可通过 `--` 透传参数覆盖
+- `dx db migrate --dev` 必须通过 `--name` 或 `-n` 指定迁移名，禁止依赖 Prisma 交互式输入
 - `dx db migrate` 仅允许在 `--dev` 环境创建迁移；非开发环境请使用 `dx db deploy`
+- `dx db generate/migrate/deploy/reset/seed/script` 会禁用 Nx 缓存，避免命中缓存后未实际执行
+- `dx deploy` 仅支持 `--dev`、`--staging`、`--prod`，不支持 `--test` / `--e2e`
 - `dx start` 未指定服务时默认是开发套件，仅允许 `--dev`
 - `dx start` 下的单层目标（如 `stagewise-front`）默认仅支持 `--dev`
 - `dx build` 显式传入环境标志时，必须是该 target 实际支持的环境
+- `dx worktree` 是 dx 的 issue worktree 封装，与原生 `git worktree` 行为不同，不要混用
 
 ### `dx start stack` 配置详解（PM2 交互式服务栈）
 

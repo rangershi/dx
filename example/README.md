@@ -112,6 +112,10 @@ node ./bin/dx.js --config-dir ./example/dx/config help build
 - `dx build backend --dev` 执行 `build.backend.development`
 - `dx build backend --prod` 执行 `build.backend.production`
 
+测试命令有一层内置参数补齐：`dx test unit ...` 默认追加 `--maxWorkers=8`，`dx test e2e ...` 默认追加 `--workers=8`。如果 `commands.json` 或 `--` 透传参数已经指定了对应 worker 参数，dx 会保留显式配置，不再重复追加。
+
+测试命令还会自动选择环境：`dx test unit ...` 使用 `--test`，`dx test e2e ...` 使用 `--e2e`。如果 E2E target 配了 `requiresPath: true`，调用时必须提供文件或目录路径，不能用 `all` 跑全量。
+
 ### 2. 帮助输出配置
 
 例如：
@@ -161,10 +165,16 @@ node ./bin/dx.js --config-dir ./example/dx/config help build
 
 ```bash
 dx start backend --dev
-dx build backend --staging
+dx build backend --dev
 dx build backend --prod
+dx deploy backend --staging
 dx db migrate --dev --name init-user-table
+dx db script fix-user-data --dev -- --dry-run
+dx test unit backend apps/backend/src/app.service.spec.ts
+dx test e2e backend apps/backend/e2e/health
 ```
+
+通用选项里，`-Y` / `--yes` 用于跳过危险操作确认，`-v` / `--verbose` 用于给支持的 Nx 命令追加详细输出，`-V` / `--version` 输出 dx 版本号。只有裸 `dx -v` 会按常见 CLI 习惯输出版本号。
 
 ### 3. 默认开发套件必须显式写在 `start.development`
 
