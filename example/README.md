@@ -112,7 +112,7 @@ node ./bin/dx.js --config-dir ./example/dx/config help build
 - `dx build backend --dev` 执行 `build.backend.development`
 - `dx build backend --prod` 执行 `build.backend.production`
 
-测试命令有一层内置参数补齐：`dx test unit ...` 默认追加 `--maxWorkers=8`，`dx test e2e ...` 默认追加 `--workers=8`。如果 `commands.json` 或 `--` 透传参数已经指定了对应 worker 参数，dx 会保留显式配置，不再重复追加。
+测试命令有一层内置参数补齐：`dx test unit ...` 默认追加 `--maxWorkers=8`，`dx test e2e ...` 默认追加 `--workers=8`。如果 `commands.json` 或 `--` 透传参数已经指定了对应 worker 参数，dx 会保留显式配置，不再重复追加。unit 命令检测到 Jest `--runInBand` 时，也不会再追加 `--maxWorkers=8`，避免互斥参数冲突。
 
 测试命令还会自动选择环境：`dx test unit ...` 使用 `--test`，`dx test e2e ...` 使用 `--e2e`。如果 E2E target 配了 `requiresPath: true`，调用时必须提供文件或目录路径，不能用 `all` 跑全量。
 

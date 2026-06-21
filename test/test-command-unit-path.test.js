@@ -56,6 +56,12 @@ function writeProjectConfig(workspaceDir, target, config) {
   writeFileSync(join(projectDir, 'project.json'), JSON.stringify(config, null, 2))
 }
 
+function writeAppPackage(workspaceDir, target, pkg) {
+  const projectDir = join(workspaceDir, 'apps', target)
+  mkdirSync(projectDir, { recursive: true })
+  writeFileSync(join(projectDir, 'package.json'), JSON.stringify(pkg, null, 2))
+}
+
 function createCommandsFixture() {
   return {
     test: {
@@ -303,6 +309,46 @@ describe('dx test unit path forwarding', () => {
 
     expect(result.code).toBe(0)
     expect(result.output).toContain('--maxWorkers=2')
+    expect(result.output).not.toContain('--maxWorkers=8')
+  })
+
+  test('unit target with runInBand package script does not append maxWorkers for a file run', () => {
+    const configDir = createTempConfigDir(createCommandsFixture())
+    const workspaceDir = createRunnableWorkspace()
+    writeAppPackage(workspaceDir, 'backend', {
+      name: '@net/backend',
+      scripts: {
+        test: 'jest --config ./jest-unit.json --runInBand',
+      },
+    })
+    const testPath = 'apps/backend/src/modules/chat/chat.service.spec.ts'
+
+    const result = runDx(
+      ['--config-dir', configDir, 'test', 'unit', 'nxBackend', testPath],
+      { cwd: workspaceDir },
+    )
+
+    expect(result.code).toBe(0)
+    expect(result.output).toContain('nx test backend')
+    expect(result.output).not.toContain('--maxWorkers=8')
+  })
+
+  test('unit target with runInBand package script does not append maxWorkers for a full run', () => {
+    const configDir = createTempConfigDir(createCommandsFixture())
+    const workspaceDir = createRunnableWorkspace()
+    writeAppPackage(workspaceDir, 'backend', {
+      name: '@net/backend',
+      scripts: {
+        test: 'jest --config ./jest-unit.json --runInBand',
+      },
+    })
+
+    const result = runDx(['--config-dir', configDir, 'test', 'unit', 'nxBackend'], {
+      cwd: workspaceDir,
+    })
+
+    expect(result.code).toBe(0)
+    expect(result.output).toContain('nx test backend')
     expect(result.output).not.toContain('--maxWorkers=8')
   })
 })

@@ -249,6 +249,7 @@ dx cache clear -Y
 - `dx test unit ...` 会自动追加 `--maxWorkers=8`
 - `dx test e2e ...` 会自动追加 `--workers=8`
 - 如果命令配置或 `--` 透传参数里已经指定了对应 worker 参数，dx 不会重复追加；例如 `dx test e2e backend apps/backend/e2e/auth -- --workers=2`
+- 如果 unit 命令或对应 `apps/<target>/package.json` 的 `scripts.test` 已使用 Jest `--runInBand`，dx 不会追加 `--maxWorkers=8`，避免触发 Jest 互斥参数错误
 
 关于 `dx initial`：
 
@@ -270,7 +271,7 @@ dx cache clear -Y
 
 - 对声明了 `requiresPath: true` 的 E2E target，`dx test e2e <target>` 必须提供文件或目录路径，禁止无路径或 `all` 全量执行
 - `dx test e2e all` 不受支持，必须显式指定 target 和路径
-- `dx test unit ...` 默认使用 8 个 worker；`dx test e2e ...` 默认使用 8 个 worker；可通过 `--` 透传参数覆盖
+- `dx test unit ...` 默认使用 8 个 worker；`dx test e2e ...` 默认使用 8 个 worker；可通过 `--` 透传参数覆盖；unit 检测到 Jest `--runInBand` 时不会追加 `--maxWorkers`
 - `dx db migrate --dev` 必须通过 `--name` 或 `-n` 指定迁移名，禁止依赖 Prisma 交互式输入
 - `dx db migrate` 仅允许在 `--dev` 环境创建迁移；非开发环境请使用 `dx db deploy`
 - `dx db generate/migrate/deploy/reset/seed/script` 会禁用 Nx 缓存，避免命中缓存后未实际执行
