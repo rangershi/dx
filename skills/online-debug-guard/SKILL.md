@@ -1,6 +1,6 @@
 ---
 name: online-debug-guard
-description: 在线调试安全护栏技能。用于排查数据库、Redis、服务配置等线上或准线上问题时，强制执行环境识别、模式校验和本地环境文件存在性检查，防止误连误操作。触发场景：用户提到在线调试、连库排查、查 Redis、生产环境排障、按指定环境排查问题。
+description: 仅在用户显式调用 $online-debug-guard 或明确要求使用 online-debug-guard 技能时使用；不要通过关键词、任务类型或上下文自动触发。
 ---
 
 # 在线调试安全护栏

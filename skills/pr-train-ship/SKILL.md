@@ -1,6 +1,6 @@
 ---
 name: pr-train-ship
-description: 仅在用户显式调用 $pr-train-ship 或明确要求使用 pr-train-ship 技能时使用；不要通过关键词自动触发。
+description: 仅在用户显式调用 $pr-train-ship 或明确要求使用 pr-train-ship 技能时使用；不要通过关键词、任务类型或上下文自动触发。
 ---
 
 # PR Train Ship — PR 审查 · 修复 · 自动合并

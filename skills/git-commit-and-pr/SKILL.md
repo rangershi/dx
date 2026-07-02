@@ -1,6 +1,6 @@
 ---
 name: git-commit-and-pr
-description: 在 Git 仓库中执行自动化 Issue、Commit、PR 工作流。用于以下场景：需要零输入一键完成 Issue→分支→Commit→PR；需要根据仓库状态自动判断下一步；需要创建结构化 GitHub Issue；需要基于暂存变更生成规范 commit；需要推送分支并创建 Pull Request；需要串联输出清晰阶段结果。支持仅建 Issue、仅建 PR、指定 Issue 编号、指定 PR 基准分支。
+description: 仅在用户显式调用 $git-commit-and-pr 或明确要求使用 git-commit-and-pr 技能时使用；不要通过关键词、任务类型或上下文自动触发。
 ---
 
 # Git Commit And PR

@@ -1,6 +1,6 @@
 ---
 name: create-issue
-description: 仅在用户显式调用 /create-issue 或明确要求使用 create-issue 技能时使用；不要通过关键词自动触发。用于把已收敛的设计对照 / 缺陷调查 / 需求讨论落成开发者可快速定位、可客观验收的 GitHub issue。
+description: 仅在用户显式调用 $create-issue、/create-issue 或明确要求使用 create-issue 技能时使用；不要通过关键词、任务类型或上下文自动触发。
 ---
 
 # Create Issue

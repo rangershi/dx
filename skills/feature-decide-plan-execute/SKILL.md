@@ -1,6 +1,6 @@
 ---
 name: feature-decide-plan-execute
-description: 仅在用户显式调用 $feature-decide-plan-execute 或明确要求使用 feature-decide-plan-execute 技能时使用；不要通过关键词自动触发。
+description: 仅在用户显式调用 $feature-decide-plan-execute 或明确要求使用 feature-decide-plan-execute 技能时使用；不要通过关键词、任务类型或上下文自动触发。
 ---
 
 # Feature Decide · Plan · Execute · Push

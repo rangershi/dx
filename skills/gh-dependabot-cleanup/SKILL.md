@@ -1,6 +1,6 @@
 ---
 name: gh-dependabot-cleanup
-description: Use when a user asks to check or remediate GitHub Dependabot alerts and deliver one closed-loop PR, including alert triage, dependency updates, verification, and PR creation with unresolved items clearly documented.
+description: 仅在用户显式调用 $gh-dependabot-cleanup 或明确要求使用 gh-dependabot-cleanup 技能时使用；不要通过关键词、任务类型或上下文自动触发。
 ---
 
 # GH Dependabot Cleanup

@@ -1,6 +1,6 @@
 ---
 name: issues-batch-deliver
-description: 仅在用户显式调用 $issues-batch-deliver 或明确要求使用 issues-batch-deliver 技能时使用；不要通过关键词自动触发。
+description: 仅在用户显式调用 $issues-batch-deliver 或明确要求使用 issues-batch-deliver 技能时使用；不要通过关键词、任务类型或上下文自动触发。
 ---
 
 # Issues Batch Deliver — 批量 Issue 编排器

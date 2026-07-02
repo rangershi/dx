@@ -2,3 +2,6 @@ interface:
   display_name: "Dependabot Cleanup PR"
   short_description: "Fix GitHub Dependabot alerts in one PR workflow"
   default_prompt: "Use $gh-dependabot-cleanup to remediate open Dependabot alerts and create one PR."
+
+policy:
+  allow_implicit_invocation: false

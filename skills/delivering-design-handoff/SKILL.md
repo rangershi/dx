@@ -1,6 +1,6 @@
 ---
 name: delivering-design-handoff
-description: Use when a design is already approved and the user asks to create a design/spec doc, implementation plan, adversarial review, GitHub issue, issue branch, handoff document, commit, push, or copyable assignment text.
+description: 仅在用户显式调用 $delivering-design-handoff 或明确要求使用 delivering-design-handoff 技能时使用；不要通过关键词、任务类型或上下文自动触发。
 ---
 
 # Delivering Design Handoff

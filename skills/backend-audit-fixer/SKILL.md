@@ -1,6 +1,6 @@
 ---
 name: backend-audit-fixer
-description: 必须显式调用才触发
+description: 仅在用户显式调用 $backend-audit-fixer 或明确要求使用 backend-audit-fixer 技能时使用；不要通过关键词、任务类型或上下文自动触发。
 ---
 
 # 后端规范审计与修复（伞 skill）

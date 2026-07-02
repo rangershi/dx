@@ -1,6 +1,6 @@
 ---
 name: stagewise-ui-debugging
-description: Use when comparing the ai-monorepo Stagewise design system with the front app for UI alignment, visual QA, responsive layout checks, DOM inspection, or design draft debugging.
+description: 仅在用户显式调用 $stagewise-ui-debugging 或明确要求使用 stagewise-ui-debugging 技能时使用；不要通过关键词、任务类型或上下文自动触发。
 ---
 
 # Stagewise UI 调试
