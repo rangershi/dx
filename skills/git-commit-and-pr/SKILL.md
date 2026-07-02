@@ -163,31 +163,85 @@ git log origin/main..HEAD --oneline
 git diff origin/main...HEAD --stat
 ```
 
-3. 创建 PR（默认 `--base main`）：
+3. 生成 PR body 文件（默认 `--base main`）。**禁止** 用 `gh pr create --body-file -`、`gh pr edit --body-file -` 或 `--body "..."` 传多行正文；在 `rtk`/shell 包装下 stdin 可能被吞掉，命令返回成功但 GitHub PR body 为空。必须先写入临时 markdown 文件，再用 `--body-file <file>`。
 
 ```bash
-gh pr create --base main --title '<type>: <概要>' --body-file - <<'EOF'
-## 变更说明
+pr_body_file="$(mktemp "${TMPDIR:-/tmp}/pr-body.XXXXXX.md")"
+cat > "$pr_body_file" <<'MSG'
+## 变更目的
 
-- <变更项>
+- 对应 Issue 验收标准 [1]：<说明落点>
+- 关键代码改动概述：<说明关键决策，不复述 diff>
 
-## 测试
+## 主要改动和解决的问题
 
-- [ ] 本地测试通过
+- 解决的问题：<对应 Issue 验收标准或新发现问题>
+- 改动点：<文件/模块/功能>
+- 改动原因：<为什么要改>
+
+## 遗留的问题
+
+- 无。/ <本 PR 未覆盖但属于 Issue 范围的项，必须挂后续 Issue/PR>
+
+## 已做的验证
+
+- 测试：<新增/修改的测试文件与用例名>
+- 命令：<可复现命令和关键结果>
+- 手测：<关键路径步骤与结果；没有则写“未额外执行浏览器手测，原因：...”>
+
+##  PR 遗留未做的
+
+- 无。/ <仍欠动作，必须挂 owner 或后续 Issue/PR>
+
+## 关联
 
 Closes: #<issue-id>
-EOF
+MSG
 ```
 
-4. 成功后输出评审命令：`/pr-review-loop --pr <PR_NUMBER>`。
+4. 创建 PR 并读回校验：
+
+```bash
+pr_url="$(gh pr create --base main --title '<type>: <概要>' --body-file "$pr_body_file")"
+pr_number="$(gh pr view "$pr_url" --json number --jq '.number')"
+pr_body="$(gh pr view "$pr_number" --json body --jq '.body')"
+
+test -n "$pr_body"
+for heading in \
+  "## 变更目的" \
+  "## 主要改动和解决的问题" \
+  "## 遗留的问题" \
+  "## 已做的验证" \
+  "##  PR 遗留未做的" \
+  "## 关联"
+do
+  printf '%s\n' "$pr_body" | grep -F "$heading" >/dev/null
+done
+printf '%s\n' "$pr_body" | grep -F "Closes: #<issue-id>" >/dev/null
+rm -f "$pr_body_file"
+```
+
+5. 如果读回校验失败：不要声称 PR 创建完成。重新生成临时 body 文件，用 `gh pr edit <PR_NUMBER> --body-file "$pr_body_file"` 修复，再重复第 4 步读回校验。**不要**相信 `ok edited`，只相信 `gh pr view --json body` 的读回内容。
+
+6. 成功后输出评审命令：`/pr-review-loop --pr <PR_NUMBER>`。
 
 ## 质量检查
 
 - 标题简洁可读，语义明确。
 - 描述包含背景、问题、目标、影响范围。
+- PR body 必须读回非空，并包含 PR 模板六个必填章节与 `Closes: #<issue-id>`。
 - 提交与 PR 文案可核对到 diff。
 - 标签与提交类型匹配。
 - 不泄露敏感信息。
+
+## 红旗：PR body 可能为空
+
+出现以下任一情况时，立即停止并读回校验，不要继续输出成功：
+
+- 使用了 `gh pr create --body-file -` 或 `gh pr edit --body-file -`
+- 使用了 `gh pr create --body "多行正文"` 或 `gh pr edit --body "多行正文"`
+- `gh pr create/edit` 输出了 `ok`，但还没有执行 `gh pr view <PR> --json body --jq '.body'`
+- PR body 未包含「变更目的 / 主要改动和解决的问题 / 遗留的问题 / 已做的验证 / PR 遗留未做的 / 关联」
 
 ## 失败与阻塞输出
 

@@ -42,11 +42,11 @@ describe('runCodexInitial', () => {
 
   test('syncs packaged skill directories into ~/.agents/skills and links them into ~/.claude/skills', async () => {
     mkdirSync(join(packageRoot, 'skills', 'skill-a', 'references'), { recursive: true })
-    mkdirSync(join(packageRoot, 'skills', 'skill-b', 'agents'), { recursive: true })
+    mkdirSync(join(packageRoot, 'skills', 'skill-b', 'references'), { recursive: true })
     writeFileSync(join(packageRoot, 'skills', 'skill-a', 'SKILL.md'), '# new skill a')
     writeFileSync(join(packageRoot, 'skills', 'skill-a', 'config.yaml'), 'k: new')
     writeFileSync(join(packageRoot, 'skills', 'skill-a', 'references', 'readme.md'), 'new ref')
-    writeFileSync(join(packageRoot, 'skills', 'skill-b', 'agents', 'openai.yaml'), 'model: gpt')
+    writeFileSync(join(packageRoot, 'skills', 'skill-b', 'references', 'guide.md'), 'new guide')
 
     mkdirSync(join(homeDir, '.codex', 'skills', 'skill-a', 'references'), { recursive: true })
     mkdirSync(join(homeDir, '.codex', 'skills', 'skill-existing-only'), { recursive: true })
@@ -67,7 +67,7 @@ describe('runCodexInitial', () => {
     expect(readFileSync(join(homeDir, '.agents', 'skills', 'skill-a', 'SKILL.md'), 'utf8')).toBe('# new skill a')
     expect(readFileSync(join(homeDir, '.agents', 'skills', 'skill-a', 'config.yaml'), 'utf8')).toBe('k: new')
     expect(readFileSync(join(homeDir, '.agents', 'skills', 'skill-a', 'references', 'readme.md'), 'utf8')).toBe('new ref')
-    expect(readFileSync(join(homeDir, '.agents', 'skills', 'skill-b', 'agents', 'openai.yaml'), 'utf8')).toBe('model: gpt')
+    expect(readFileSync(join(homeDir, '.agents', 'skills', 'skill-b', 'references', 'guide.md'), 'utf8')).toBe('new guide')
     expect(existsSync(join(homeDir, '.agents', 'skills', 'skill-a', 'references', 'keep.md'))).toBe(false)
 
     expect(existsSync(join(homeDir, '.codex', 'skills', 'skill-a'))).toBe(false)
@@ -81,7 +81,7 @@ describe('runCodexInitial', () => {
     expect(readFileSync(join(homeDir, '.claude', 'skills', 'skill-a', 'SKILL.md'), 'utf8')).toBe('# new skill a')
     expect(readFileSync(join(homeDir, '.claude', 'skills', 'skill-a', 'config.yaml'), 'utf8')).toBe('k: new')
     expect(readFileSync(join(homeDir, '.claude', 'skills', 'skill-a', 'references', 'readme.md'), 'utf8')).toBe('new ref')
-    expect(readFileSync(join(homeDir, '.claude', 'skills', 'skill-b', 'agents', 'openai.yaml'), 'utf8')).toBe('model: gpt')
+    expect(readFileSync(join(homeDir, '.claude', 'skills', 'skill-b', 'references', 'guide.md'), 'utf8')).toBe('new guide')
     expect(existsSync(join(homeDir, '.claude', 'skills', 'skill-a', 'references', 'keep.md'))).toBe(false)
     expect(readFileSync(join(homeDir, '.claude', 'skills', 'skill-existing-only', 'SKILL.md'), 'utf8')).toBe('# existing claude only')
   })
@@ -97,6 +97,27 @@ describe('runCodexInitial', () => {
     expect(existsSync(join(homeDir, '.codex', 'skills', 'skill-a'))).toBe(false)
     expect(lstatSync(join(homeDir, '.claude', 'skills', 'skill-a')).isSymbolicLink()).toBe(true)
     expect(existsSync(join(homeDir, '.claude', 'skills', 'skill-a', 'SKILL.md'))).toBe(true)
+  })
+
+  test('removes stale agent metadata files when a packaged skill no longer ships them', async () => {
+    mkdirSync(join(packageRoot, 'skills', 'git-commit-and-pr'), { recursive: true })
+    writeFileSync(join(packageRoot, 'skills', 'git-commit-and-pr', 'SKILL.md'), '# updated skill')
+
+    mkdirSync(join(homeDir, '.agents', 'skills', 'git-commit-and-pr', 'agents'), { recursive: true })
+    writeFileSync(join(homeDir, '.agents', 'skills', 'git-commit-and-pr', 'SKILL.md'), '# old skill')
+    writeFileSync(
+      join(homeDir, '.agents', 'skills', 'git-commit-and-pr', 'agents', 'openai.yaml'),
+      'model: old',
+    )
+
+    await runCodexInitial({ packageRoot, homeDir })
+
+    expect(readFileSync(join(homeDir, '.agents', 'skills', 'git-commit-and-pr', 'SKILL.md'), 'utf8')).toBe(
+      '# updated skill',
+    )
+    expect(existsSync(join(homeDir, '.agents', 'skills', 'git-commit-and-pr', 'agents', 'openai.yaml'))).toBe(false)
+    expect(lstatSync(join(homeDir, '.claude', 'skills', 'git-commit-and-pr')).isSymbolicLink()).toBe(true)
+    expect(existsSync(join(homeDir, '.claude', 'skills', 'git-commit-and-pr', 'agents', 'openai.yaml'))).toBe(false)
   })
 
   test('removes old non-symlink managed skill directories from ~/.codex/skills and ~/.claude/skills', async () => {
