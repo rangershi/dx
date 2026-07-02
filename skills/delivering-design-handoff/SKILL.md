@@ -37,7 +37,6 @@ By the end, produce all of these or clearly state the blocker:
 | Issue branch | `codex/docs/<issue-id>-<slug>` for docs-only handoff, or matching repo convention |
 | Commit | Conventional commit ending with `Refs: #<issue-id>` |
 | Push | Branch pushed with upstream |
-| Pull request | PR created or updated with the repo PR template, non-empty body, linked issue, doc paths, verification evidence, and read-back validation |
 | Issue comment | Comment linking branch, commit, spec, plan, and handoff, plus the same project-manager-style assignment block from the final answer |
 | Final answer | Short status plus a copyable project-manager-style assignment block |
 
@@ -144,7 +143,7 @@ This is separate from the implementation plan. It is the short assignment packet
 - implementation order summary
 - top risks and invariants
 - required verification commands
-- PR expectations and acceptance checklist pointer
+- delivery boundary and acceptance checklist pointer
 
 Run placeholder scan over all docs. Placeholders that must be filled before commit, such as issue id after creation, must not remain.
 
@@ -217,84 +216,11 @@ rtk git push -u origin <branch>
 
 Comment on the issue with branch, commit, spec path, plan path, handoff path, and the copyable project-manager-style assignment block from the final answer. This issue comment is mandatory; do not finish with only a local final answer.
 
-### 10. Create or update the pull request
+### 10. Do not create a pull request
 
-If the user asks for a PR, or repo convention expects a PR for the handoff branch, create or update it before the final answer.
+This skill stops after the handoff docs are committed, pushed to the remote issue branch, and linked from the GitHub issue comment. Do not create or update a PR for the docs-only handoff branch as part of this workflow, even when the repository's normal implementation flow expects PRs.
 
-PR body must be written to a temporary markdown file and passed with `--body-file "$pr_body_file"`. Never use `gh pr create --body-file -`, `gh pr edit --body-file -`, or `--body "multi-line text"` for PR content. Do not trust `ok` or a returned URL as proof that the body was saved; only trust a read-back from `gh pr view --json body`.
-
-Use the repository PR template. When this repo's template is the standard git workflow template, the body must include all of these headings exactly:
-
-- `## 变更目的`
-- `## 主要改动和解决的问题`
-- `## 遗留的问题`
-- `## 已做的验证`
-- `##  PR 遗留未做的`
-- `## 关联`
-
-The body must also include:
-
-- `Closes: #<issue-id>`
-- branch name
-- commit sha or subject
-- spec path
-- plan path
-- handoff path
-- verification commands and results, or an explicit docs-only note
-
-Example shape:
-
-```bash
-pr_body_file="$(mktemp "${TMPDIR:-/tmp}/handoff-pr-body.XXXXXX.md")"
-cat > "$pr_body_file" <<'MSG'
-## 变更目的
-<why this handoff exists and which approved design it packages>
-
-## 主要改动和解决的问题
-- 新增设计文档：`<spec-path>`
-- 新增实施计划：`<plan-path>`
-- 新增交接文档：`<handoff-path>`
-- 分支：`<branch>`
-- 提交：`<sha> <subject>`
-
-## 遗留的问题
-- 无，或列出明确遗留风险和处理建议。
-
-## 已做的验证
-- `rtk git diff --cached --check`：通过
-- `rtk rg -n "TBD|TODO|待定|占位|\\.\\.\\." <spec-path> <plan-path> <handoff-path>`：无真实占位
-- 文档交付，无需运行构建或测试。
-
-##  PR 遗留未做的
-- 无，或列出需要后续实现 PR 完成的事项。
-
-## 关联
-Closes: #<issue-id>
-MSG
-
-pr_url="$(rtk gh pr create --base main --title 'docs: add <topic> handoff' --body-file "$pr_body_file")"
-pr_number="$(rtk gh pr view "$pr_url" --json number --jq '.number')"
-pr_body="$(rtk gh pr view "$pr_number" --json body --jq '.body')"
-test -n "$pr_body"
-for heading in \
-  "## 变更目的" \
-  "## 主要改动和解决的问题" \
-  "## 遗留的问题" \
-  "## 已做的验证" \
-  "##  PR 遗留未做的" \
-  "## 关联"; do
-  printf '%s\n' "$pr_body" | grep -F "$heading" >/dev/null
-done
-printf '%s\n' "$pr_body" | grep -F "Closes: #<issue-id>" >/dev/null
-printf '%s\n' "$pr_body" | grep -F "<branch>" >/dev/null
-printf '%s\n' "$pr_body" | grep -F "<sha>" >/dev/null
-printf '%s\n' "$pr_body" | grep -F "<spec-path>" >/dev/null
-printf '%s\n' "$pr_body" | grep -F "<plan-path>" >/dev/null
-printf '%s\n' "$pr_body" | grep -F "<handoff-path>" >/dev/null
-rm -f "$pr_body_file"
-```
-
-If a PR already exists, use the same temp-file path with `rtk gh pr edit <pr-number> --body-file "$pr_body_file"`, then run the same read-back validation. If any heading, issue link, doc path, branch, commit, or verification evidence is missing, fix the temp body file, edit again, and read back again before continuing.
+If the user explicitly asks for a PR, treat that as a separate follow-up workflow after this handoff is complete.
 
 ### 11. Final verification
 
@@ -308,8 +234,6 @@ rtk git rev-parse --abbrev-ref --symbolic-full-name @{u}
 
 Report actual state. If no tests/builds were run because this is docs-only, say that.
 
-If a PR was created or updated, read back the PR body and verify it is non-empty, follows the repo template headings, includes `Closes: #<issue-id>`, and contains the branch, commit, spec path, plan path, handoff path, and verification evidence. If `gh pr create` or `gh pr edit` reported success but read-back is empty or incomplete, repair the PR with a temp body file and read it back again before claiming completion.
-
 Read back the issue comments and verify that the latest handoff comment contains the branch, commit, spec path, plan path, handoff path, and the same assignment block shown in the final answer. If `gh issue comment` failed, the comment is missing, or the readback does not match the final assignment block, fix that before claiming completion.
 
 ## Final Answer Template
@@ -320,7 +244,6 @@ Keep it short, then include this copyable block:
 已准备好交接资料：
 
 - Issue：#<issue-id> <issue-url>
-- PR：#<pr-id> <pr-url>
 - 分支：`<branch>`
 - 提交：`<sha> <subject>`
 - 设计文档：`<spec-path>`
@@ -346,7 +269,7 @@ Keep it short, then include this copyable block:
 - `<verification-command-2>`
 - `<verification-command-3>`
 
-验收标准以 Issue #<issue-id> 的 checklist 为准。提 PR 时请逐条对应验收标准，并贴出验证命令结果；如遇到与设计文档冲突的实现细节，先在 Issue 中同步风险和建议处理方式。
+验收标准以 Issue #<issue-id> 的 checklist 为准。实现过程中如遇到与设计文档冲突的细节，先在 Issue 中同步风险和建议处理方式。
 ```
 
 In Codex app, after successful git actions, also emit the app directives for branch creation, staging, commit, and push.
@@ -363,7 +286,5 @@ In Codex app, after successful git actions, also emit the app directives for bra
 - Writing a handoff that says “add tests” without exact files, behaviors, and commands.
 - Forgetting the issue comment, leaving the receiving engineer to hunt for branch and docs.
 - Posting an issue comment with links only, but omitting the project-manager-style assignment block.
-- Creating or editing a PR with `--body-file -` and assuming the body was saved.
-- Trusting `gh pr create`, `gh pr edit`, or `ok` without reading back `gh pr view --json body`.
-- Creating a PR whose body is empty, misses the repo template headings, omits `Closes: #<issue-id>`, or lacks doc paths and verification evidence.
+- Creating or updating a PR for the docs-only handoff branch instead of stopping after commit, push, and issue comment.
 - Final answer lists artifacts but omits the copyable project-manager-style assignment block.
