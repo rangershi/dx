@@ -250,6 +250,67 @@ describe('dx test e2e target-specific fileCommand', () => {
     expect(result.output).not.toContain('nx test:e2e backend')
   })
 
+  test('backend vitest target forwards a spaced -t pattern outside worker comments', () => {
+    const commands = createCommandsFixture()
+    commands.test.e2e.backend.command = 'pnpm exec nx test:e2e backend'
+    commands.test.e2e.backend.fileCommand =
+      'bash -lc \'printf "WRAPPER_PATH=%s\\n" "$1"; : --maxWorkers=8\' _ {TEST_PATH} # --workers'
+    const configDir = createTempConfigDir(commands)
+    const workspaceDir = createRunnableWorkspace()
+    writeProjectConfig(workspaceDir, 'backend', {
+      targets: {
+        'test:e2e': {
+          options: {
+            command: 'node -e "console.log(process.argv.slice(1).join(\'\\n\'))" -- vitest run',
+            cwd: 'apps/backend',
+          },
+        },
+      },
+    })
+    const testPath = 'apps/backend/e2e/character/character.e2e-spec.ts'
+    const pattern = 'should reject creating a character with more than five tags'
+
+    const result = runDx(
+      ['--config-dir', configDir, 'test', 'e2e', 'backend', testPath, '-t', pattern],
+      { cwd: workspaceDir },
+    )
+
+    expect(result.code).toBe(0)
+    expect(result.output).toContain(
+      `vitest\nrun\ne2e/character/character.e2e-spec.ts\n-t\n${pattern}\n--maxWorkers=8`,
+    )
+    expect(result.output).not.toMatch(/# --workers.* -t/)
+  })
+
+  test('custom fileCommand without a worker comment remains authoritative', () => {
+    const commands = createCommandsFixture()
+    commands.test.e2e.backend.command = 'pnpm exec nx test:e2e backend'
+    commands.test.e2e.backend.fileCommand =
+      'node -e "console.log(\'CUSTOM_FILE_COMMAND=\' + process.argv[1])" -- {TEST_PATH}'
+    const configDir = createTempConfigDir(commands)
+    const workspaceDir = createRunnableWorkspace()
+    writeProjectConfig(workspaceDir, 'backend', {
+      targets: {
+        'test:e2e': {
+          options: {
+            command: 'node -e "console.log(\'DIRECT_TARGET\')"',
+            cwd: 'apps/backend',
+          },
+        },
+      },
+    })
+    const testPath = 'apps/backend/e2e/auth/auth.login.e2e-spec.ts'
+
+    const result = runDx(
+      ['--config-dir', configDir, 'test', 'e2e', 'backend', testPath],
+      { cwd: workspaceDir },
+    )
+
+    expect(result.code).toBe(0)
+    expect(result.output).toContain(`CUSTOM_FILE_COMMAND=${testPath}`)
+    expect(result.output).not.toContain('DIRECT_TARGET')
+  })
+
   test('guarded target without fileCommand fails with a configuration error', () => {
     const configDir = createTempConfigDir(createCommandsFixture())
     const workspaceDir = createRunnableWorkspace()
