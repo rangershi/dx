@@ -24,6 +24,7 @@ pnpm-debug.log*
 
 # PR review loop cache
 .cache/
+/.worktrees/
 
 # Python
 __pycache__/
@@ -37,4 +38,3 @@ __pycache__/
 /.superset/config.json
 /.omx/
 /.idea/
-
