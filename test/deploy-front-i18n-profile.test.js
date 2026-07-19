@@ -36,13 +36,14 @@ afterEach(() => {
   }
 })
 
-function createDeployCli(target, rawArgs) {
+function createDeployCli(target, rawArgs, targetConfig = {}) {
   return {
     invocation: 'dx',
     commands: {
       deploy: {
         [target]: {
           description: `deploy ${target}`,
+          ...targetConfig,
         },
       },
     },
@@ -93,6 +94,21 @@ describe('deploy front i18n profile', () => {
     expect(deployToVercel).toHaveBeenCalledWith(
       'admin',
       expect.objectContaining({ environment: 'staging' }),
+    )
+  })
+
+  test('passes declarative Vercel target configuration to the adapter', async () => {
+    const vercel = {
+      configFile: 'vercel.front.br.json',
+      projectIdEnvVar: 'VERCEL_PROJECT_ID_FRONT',
+    }
+    const cli = createDeployCli('front-br', ['deploy', 'front-br', '--prod'], { vercel })
+
+    await handleDeploy(cli, ['front-br'])
+
+    expect(deployToVercel).toHaveBeenCalledWith(
+      'front-br',
+      expect.objectContaining({ environment: 'production', targetConfig: vercel }),
     )
   })
 })

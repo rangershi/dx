@@ -218,6 +218,8 @@ dx 的命令由 `dx/config/commands.json` 驱动，并且内置了一些 interna
 - `dx export <target>`：执行配置化导出命令
 - `dx contracts [generate|pull]`：导出 OpenAPI 并生成 `packages/api-contracts` 下的 Zod 合约（需要目标工程具备对应结构）
 - `dx release version <version>`：同步更新常见 app 包版本号
+- 内置命令族支持项目扩展：例如项目可在 `commands.json.release.plan/run` 中声明
+  `dx release plan --prod` 和 `dx release run --prod`，同时保留内置的 `release version`
 - `dx initial`：同步包内 skills 到本机 agent 目录
 
 常用示例：
@@ -357,6 +359,32 @@ dx cache clear -Y
 
 - 需要的前置构建（例如 `shared`、`api-contracts`、OpenAPI 导出、后端构建等）应由项目自己的 Nx 依赖图（`dependsOn`/项目依赖）或 Vercel 的 `buildCommand` 负责。
 - 这样 dx deploy 不会强依赖 `apps/sdk` 等目录结构，更容易适配不同 monorepo。
+
+### 配置化 Vercel target
+
+Vercel target 不再限于 dx 内置名称。项目可以在 `commands.json` 声明任意 target，适合多品牌分别绑定配置文件和 Project ID：
+
+```json
+{
+  "deploy": {
+    "front-br": {
+      "description": "部署 br front",
+      "vercel": {
+        "configFile": "vercel.front.br.json",
+        "projectIdEnvVar": "VERCEL_PROJECT_ID_FRONT",
+        "deployCwd": ".",
+        "prebuiltCwd": "."
+      }
+    }
+  }
+}
+```
+
+```bash
+dx deploy front-br --prod
+```
+
+Project ID 的值仍由当前环境层或 CI Environment 注入；`commands.json` 只声明变量名，不保存凭据或具体 ID。
 
 ### backend 制品发布
 

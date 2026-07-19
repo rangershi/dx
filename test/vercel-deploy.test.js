@@ -128,6 +128,43 @@ describe('deployToVercel()', () => {
     expect(logger.info).toHaveBeenCalledWith(expect.stringContaining(`prebuiltCwd=${cwd}`))
   })
 
+  test('accepts a project-configured Vercel target without hardcoded target knowledge', async () => {
+    process.env.VERCEL_TOKEN = 'token'
+    process.env.VERCEL_ORG_ID = 'org'
+    process.env.VERCEL_PROJECT_ID_DESEJO_FRONT = 'project-br'
+    writeFileSync(join(tempDir, 'vercel.front.br.json'), '{}')
+    const run = jest.fn(async () => ({ stdout: 'ok', stderr: '' }))
+
+    await deployToVercel('front-br', {
+      environment: 'production',
+      run,
+      targetConfig: {
+        configFile: 'vercel.front.br.json',
+        projectIdEnvVar: 'VERCEL_PROJECT_ID_DESEJO_FRONT',
+        deployCwd: '.',
+        prebuiltCwd: '.',
+      },
+    })
+
+    expect(process.exitCode).toBeUndefined()
+    expect(run).toHaveBeenCalledTimes(2)
+    expect(run.mock.calls[0][0].find(arg => String(arg).endsWith('vercel.front.br.json'))).toBeTruthy()
+    expect(run.mock.calls[0][1].env.VERCEL_PROJECT_ID).toBe('project-br')
+  })
+
+  test('rejects an incomplete project-configured Vercel target before running Vercel', async () => {
+    const run = jest.fn()
+
+    await deployToVercel('front-br', {
+      environment: 'production',
+      run,
+      targetConfig: { configFile: 'vercel.front.br.json' },
+    })
+
+    expect(process.exitCode).toBe(1)
+    expect(run).not.toHaveBeenCalled()
+  })
+
   test('admin keeps prebuilt deploy mode', async () => {
     const cwd = process.cwd()
     writeFileSync(join(cwd, 'vercel.admin.json'), '{}')
