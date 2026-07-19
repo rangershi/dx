@@ -209,8 +209,8 @@ target（端）不写死，由 `env-policy.jsonc.targets` 定义；`commands.jso
 }
 ```
 
-私有文件遵循固定命名 `.env.<profile>.<environment>.local`，必须被 Git 忽略且权限为 `0600`。
-目标工程可在 `dx/env/templates/<profile>/<environment>.local.example` 提供不含真实值的模板。
+私有文件固定放在 `dx/env/templates/<profile>/<environment>.local`，与对应的
+`<environment>.local.example` 模板同目录。真实文件必须被 Git 忽略且权限为 `0600`；模板不含真实值。
 
 ```bash
 dx env status
@@ -219,8 +219,9 @@ dx env exec secondary --staging -- dx deploy backend
 ```
 
 `dx env exec` 会加锁、原子装配 `.env.<environment>.local`、把同一份值注入子进程，并在成功、
-失败或中断后恢复原文件。内部 `dx` 命令未指定环境时会自动补齐；指定冲突环境时直接拒绝。
-该命令只操作本机文件和子进程，不包含上传、同步或修改 GitHub Environment 的能力。
+失败或中断后删除临时文件。根目录不允许持久保存 staging/production `.local`；发现旧文件时命令
+会直接报错，必须先迁移到品牌 profile。内部 `dx` 命令未指定环境时会自动补齐；指定冲突环境时
+直接拒绝。该命令只操作本机文件和子进程，不包含上传、同步或修改 GitHub Environment 的能力。
 
 ## 示例工程
 
