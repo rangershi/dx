@@ -1,5 +1,12 @@
 import { describe, test, expect, beforeEach, afterEach, jest } from '@jest/globals'
-import { mkdtempSync, writeFileSync, rmSync, mkdirSync, existsSync } from 'node:fs'
+import {
+  mkdtempSync,
+  readFileSync,
+  writeFileSync,
+  rmSync,
+  mkdirSync,
+  existsSync,
+} from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import {
@@ -17,6 +24,25 @@ describe('deployToVercel()', () => {
   let errorSpy
   let warnSpy
   let successSpy
+
+  test('never rewrites git history to change the Vercel author', () => {
+    const source = readFileSync(new URL('../lib/vercel-deploy.js', import.meta.url), 'utf8')
+
+    expect(source).not.toContain('git commit --amend')
+  })
+
+  test('removes Vercel downloaded environment after deployment', async () => {
+    writeFileSync(join(tempDir, 'vercel.front.json'), '{}')
+    const run = jest.fn(async () => {
+      mkdirSync(join(tempDir, '.vercel'), { recursive: true })
+      writeFileSync(join(tempDir, '.vercel', '.env.production.local'), 'SECRET=value\n')
+      return { stdout: 'ok', stderr: '' }
+    })
+
+    await deployToVercel('front', { environment: 'staging', run })
+
+    expect(existsSync(join(tempDir, '.vercel', '.env.production.local'))).toBe(false)
+  })
 
   beforeEach(() => {
     originalCwd = process.cwd()
