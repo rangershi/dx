@@ -243,6 +243,7 @@ dx start stack
 ```bash
 dx deploy backend --prod
 dx deploy backend --build-only
+dx deploy backend --prod --artifact release/backend/backend-bundle-v1.2.3-20260719-120000.tgz
 dx deploy backend --prod --skip-migration
 ```
 

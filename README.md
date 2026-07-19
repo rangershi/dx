@@ -430,8 +430,11 @@ Project ID 的值仍由当前环境层或 CI Environment 注入；`commands.json
 ```bash
 dx deploy backend --prod
 dx deploy backend --build-only
+dx deploy backend --prod --artifact release/backend/backend-bundle-v1.2.3-20260719-120000.tgz
 dx deploy backend --prod --skip-migration
 ```
+
+`--build-only` 只生成制品；`--artifact <path>` 跳过本地构建并直接部署指定制品。两者可用于 CI 跨 job 传递同一个、已经验证过的 backend artifact。
 
 最小示例配置：
 

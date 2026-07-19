@@ -28,11 +28,20 @@ const { runBackendArtifactDeploy } = await import('../lib/backend-artifact-deplo
 const { deployToVercel } = await import('../lib/vercel-deploy.js')
 
 describe('backend artifact deploy routing', () => {
-  test('parseFlags reads build-only and skip-migration for backend deploy', () => {
-    const flags = parseFlags(['deploy', 'backend', '--build-only', '--skip-migration'])
+  test('deploy flags include build-only, artifact and skip-migration', () => {
+    const flags = parseFlags([
+      'deploy',
+      'backend',
+      '--build-only',
+      '--artifact',
+      'release/backend/backend-bundle-v1.tgz',
+      '--skip-migration',
+    ])
 
     expect(flags.buildOnly).toBe(true)
+    expect(flags.artifact).toBe('release/backend/backend-bundle-v1.tgz')
     expect(flags.skipMigration).toBe(true)
+    expect(FLAG_DEFINITIONS.deploy).toContainEqual({ flag: '--artifact', expectsValue: true })
   })
 
   test('deploy backend internal target dispatches to backend artifact runner', async () => {

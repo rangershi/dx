@@ -1,5 +1,5 @@
 import { describe, expect, jest, test } from '@jest/globals'
-import { runBackendArtifactDeploy } from '../lib/backend-artifact-deploy.js'
+import { loadBackendArtifact, runBackendArtifactDeploy } from '../lib/backend-artifact-deploy.js'
 
 describe('runBackendArtifactDeploy', () => {
   test('build-only runs config resolution and artifact build without remote calls', async () => {
@@ -77,6 +77,101 @@ describe('runBackendArtifactDeploy', () => {
 
     expect(result).toBe(remoteResult)
     expect(callOrder).toEqual(['resolve', 'build', 'remote'])
+  })
+
+  test('artifact input skips build and deploys the existing bundle', async () => {
+    const callOrder = []
+    const cli = {
+      projectRoot: '/repo',
+      commands: {
+        deploy: {
+          backend: {
+            backendDeploy: {},
+          },
+        },
+      },
+      flags: { artifact: 'download/backend-bundle-v1.2.3-20260719-120000.tgz' },
+    }
+    const config = {
+      projectRoot: '/repo',
+      artifact: { bundleName: 'backend-bundle' },
+      build: {},
+      runtime: {},
+      deploy: {},
+      startup: {},
+      remote: {},
+    }
+    const bundle = {
+      bundlePath: '/repo/download/backend-bundle-v1.2.3-20260719-120000.tgz',
+      versionName: 'backend-v1.2.3-20260719-120000',
+    }
+    const deps = {
+      resolveConfig: jest.fn(() => config),
+      loadArtifact: jest.fn(async () => {
+        callOrder.push('load')
+        return bundle
+      }),
+      buildArtifact: jest.fn(async () => {
+        throw new Error('should not build')
+      }),
+      deployRemotely: jest.fn(async (_config, selectedBundle) => {
+        callOrder.push('remote')
+        expect(selectedBundle).toBe(bundle)
+        return { ok: true }
+      }),
+    }
+
+    await runBackendArtifactDeploy({
+      cli,
+      target: 'backend',
+      args: ['backend', '--artifact', 'download/backend-bundle-v1.2.3-20260719-120000.tgz'],
+      environment: 'staging',
+      deps,
+    })
+
+    expect(callOrder).toEqual(['load', 'remote'])
+    expect(deps.buildArtifact).not.toHaveBeenCalled()
+  })
+
+  test('loadBackendArtifact resolves the bundle and derives its release name', async () => {
+    const ensureArtifactReadable = jest.fn(async () => {})
+    const result = await loadBackendArtifact(
+      {
+        projectRoot: '/repo',
+        artifact: { bundleName: 'backend-bundle' },
+      },
+      'download/backend-bundle-v1.2.3-20260719-120000.tgz',
+      { ensureArtifactReadable },
+    )
+
+    expect(ensureArtifactReadable).toHaveBeenCalledWith(
+      '/repo/download/backend-bundle-v1.2.3-20260719-120000.tgz',
+    )
+    expect(result).toEqual({
+      bundlePath: '/repo/download/backend-bundle-v1.2.3-20260719-120000.tgz',
+      versionName: 'backend-v1.2.3-20260719-120000',
+    })
+  })
+
+  test('build-only and artifact input are mutually exclusive', async () => {
+    await expect(
+      runBackendArtifactDeploy({
+        cli: {
+          projectRoot: '/repo',
+          commands: { deploy: { backend: { backendDeploy: {} } } },
+          flags: { buildOnly: true, artifact: 'bundle.tgz' },
+        },
+        target: 'backend',
+        args: ['backend', '--build-only', '--artifact', 'bundle.tgz'],
+        environment: 'staging',
+        deps: {
+          resolveConfig: jest.fn(() => ({
+            projectRoot: '/repo',
+            artifact: { bundleName: 'backend-bundle' },
+          })),
+        },
+      }),
+    ).rejects.toThrow('--build-only 与 --artifact 不能同时使用')
   })
 
   test('full deploy prints a concise success summary when remote verification returns details', async () => {
