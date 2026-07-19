@@ -434,7 +434,7 @@ dx deploy backend --prod --artifact release/backend/backend-bundle-v1.2.3-202607
 dx deploy backend --prod --skip-migration
 ```
 
-`--build-only` 只生成制品；`--artifact <path>` 跳过本地构建并直接部署指定制品。两者可用于 CI 跨 job 传递同一个、已经验证过的 backend artifact。
+`--build-only` 只生成制品；`--artifact <path>` 跳过本地构建并直接部署指定制品。artifact-only 发布也会跳过目标工程依赖安装，因此两者可用于 CI 跨 job 传递同一个、已经验证过的 backend artifact。
 
 最小示例配置：
 
