@@ -47,6 +47,7 @@ example/
       commands.json
       env-layers.json
       env-policy.jsonc
+      env-profiles.json
 ```
 
 这三份配置分别负责：
@@ -57,6 +58,8 @@ example/
   每个环境加载哪些 `.env` 文件
 - [env-policy.jsonc](/Users/a1/work/dx/example/dx/config/env-policy.jsonc)
   环境变量布局、机密约束、required 校验
+- [env-profiles.json](/Users/a1/work/dx/example/dx/config/env-profiles.json)
+  可选声明多品牌私有环境 profile；存在时启用 `dx env status|validate|exec`
 
 ## 最快体验方式
 

@@ -189,6 +189,39 @@ target（端）不写死，由 `env-policy.jsonc.targets` 定义；`commands.jso
 
 注：`env-policy.jsonc` 为必需配置；未提供时 dx 将直接报错。
 
+### 4) 可选的品牌环境 profile
+
+多品牌项目可以增加 `dx/config/env-profiles.json`，声明允许运维使用的 profile、环境和必须直接
+存在于私有 profile 中的键：
+
+```json
+{
+  "version": 1,
+  "environments": ["staging", "production"],
+  "profiles": {
+    "primary": { "label": "Primary brand" },
+    "secondary": { "label": "Secondary brand" }
+  },
+  "requiredLocalKeys": {
+    "staging": ["DATABASE_URL"],
+    "production": ["DATABASE_URL"]
+  }
+}
+```
+
+私有文件遵循固定命名 `.env.<profile>.<environment>.local`，必须被 Git 忽略且权限为 `0600`。
+目标工程可在 `dx/env/templates/<profile>/<environment>.local.example` 提供不含真实值的模板。
+
+```bash
+dx env status
+dx env validate secondary --staging
+dx env exec secondary --staging -- dx deploy backend
+```
+
+`dx env exec` 会加锁、原子装配 `.env.<environment>.local`、把同一份值注入子进程，并在成功、
+失败或中断后恢复原文件。内部 `dx` 命令未指定环境时会自动补齐；指定冲突环境时直接拒绝。
+该命令只操作本机文件和子进程，不包含上传、同步或修改 GitHub Environment 的能力。
+
 ## 示例工程
 
 查看 `example/`：包含一个最小可读的 `dx/config` 配置示例，以及如何在一个 pnpm+nx monorepo 中接入 dx。
@@ -218,6 +251,7 @@ dx 的命令由 `dx/config/commands.json` 驱动，并且内置了一些 interna
 - `dx export <target>`：执行配置化导出命令
 - `dx contracts [generate|pull]`：导出 OpenAPI 并生成 `packages/api-contracts` 下的 Zod 合约（需要目标工程具备对应结构）
 - `dx release version <version>`：同步更新常见 app 包版本号
+- `dx env status|validate|exec`：安全校验并临时装配多品牌私有环境 profile（需 `env-profiles.json`）
 - 内置命令族支持项目扩展：例如项目可在 `commands.json.release.plan/run` 中声明
   `dx release plan --prod` 和 `dx release run --prod`，同时保留内置的 `release version`
 - `dx initial`：同步包内 skills 到本机 agent 目录
