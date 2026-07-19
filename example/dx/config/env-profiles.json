@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "environments": ["staging", "production"],
+  "profiles": {
+    "primary": { "label": "Primary brand" },
+    "secondary": { "label": "Secondary brand" }
+  },
+  "requiredLocalKeys": {
+    "staging": ["DATABASE_URL"],
+    "production": ["DATABASE_URL"]
+  }
+}
